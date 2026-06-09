@@ -19,51 +19,77 @@ export class ScribaSessionManager {
     sampleRate: number
   }> | null = null
   private grammarRulesService = new GrammarRulesService('')
+  private isStarting = false
 
   public async startSession(mode: ScribaMode) {
-    console.log('[scribaSessionManager] Starting session with mode:', mode)
-
-    // Reuse existing global interaction ID if present, otherwise create a new one
-    let interactionId = interactionManager.getCurrentInteractionId()
-    if (interactionId) {
-      console.log(
-        '[scribaSessionManager] Reusing existing interaction ID:',
-        interactionId,
+    // Re-entrancy guard: ignore overlapping start requests (a rapid hotkey
+    // re-press, or the hotkey racing the manual pill click) during the async
+    // setup window, so we never create two interactions / two recordings for
+    // one dictation. The flag is held only for the duration of setup and is
+    // always released via `finally`, so a lost key-up can't permanently lock
+    // out future sessions.
+    if (this.isStarting) {
+      console.warn(
+        '[scribaSessionManager] startSession ignored: a start is already in progress',
       )
-      interactionManager.adoptInteractionId(interactionId)
-    } else {
-      interactionId = interactionManager.initialize()
-    }
-
-    // Initialize all necessary components
-    const started = await scribaStreamController.initialize(mode)
-    if (!started) {
-      log.error('[scribaSessionManager] Failed to initialize scribaStreamController')
       return
     }
+    this.isStarting = true
+    try {
+      console.log('[scribaSessionManager] Starting session with mode:', mode)
 
-    // Begin gRPC stream immediately (note, no audio is flowing yet)
-    this.streamResponsePromise = scribaStreamController.startGrpcStream()
+      // Reuse existing global interaction ID if present, otherwise create a new one
+      let interactionId = interactionManager.getCurrentInteractionId()
+      const createdInteraction = !interactionId
+      if (interactionId) {
+        console.log(
+          '[scribaSessionManager] Reusing existing interaction ID:',
+          interactionId,
+        )
+        interactionManager.adoptInteractionId(interactionId)
+      } else {
+        interactionId = interactionManager.initialize()
+      }
 
-    // Begin recording audio (audio bytes will now flow into the gRPC stream)
-    voiceInputService.startAudioRecording()
+      // Initialize all necessary components
+      const started = await scribaStreamController.initialize(mode)
+      if (!started) {
+        log.error(
+          '[scribaSessionManager] Failed to initialize scribaStreamController',
+        )
+        // Roll back the interaction we just created so it doesn't dangle and
+        // get adopted by an unrelated future session.
+        if (createdInteraction) {
+          interactionManager.clearCurrentInteraction()
+        }
+        return
+      }
 
-    // Send initial mode to the stream
-    scribaStreamController.setMode(mode)
+      // Begin gRPC stream immediately (note, no audio is flowing yet)
+      this.streamResponsePromise = scribaStreamController.startGrpcStream()
 
-    // Update UI state
-    recordingStateNotifier.notifyRecordingStarted(mode)
+      // Begin recording audio (audio bytes will now flow into the gRPC stream)
+      voiceInputService.startAudioRecording()
 
-    // Fetch and send context in the background (non-blocking)
-    this.fetchAndSendContext().catch(error => {
-      log.error('[scribaSessionManager] Failed to fetch/send context:', error)
-    })
+      // Send initial mode to the stream
+      scribaStreamController.setMode(mode)
 
-    // Start timing the interaction
-    timingCollector.startInteraction()
-    timingCollector.startTiming(TimingEventName.INTERACTION_ACTIVE)
+      // Update UI state
+      recordingStateNotifier.notifyRecordingStarted(mode)
 
-    return interactionId
+      // Fetch and send context in the background (non-blocking)
+      this.fetchAndSendContext().catch(error => {
+        log.error('[scribaSessionManager] Failed to fetch/send context:', error)
+      })
+
+      // Start timing the interaction
+      timingCollector.startInteraction()
+      timingCollector.startTiming(TimingEventName.INTERACTION_ACTIVE)
+
+      return interactionId
+    } finally {
+      this.isStarting = false
+    }
   }
 
   private async fetchAndSendContext() {

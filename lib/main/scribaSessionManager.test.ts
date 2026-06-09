@@ -180,6 +180,27 @@ describe('scribaSessionManager', () => {
     ).toHaveBeenCalledWith(ScribaMode.TRANSCRIBE)
   })
 
+  test('should ignore a concurrent startSession while one is in progress', async () => {
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    // Fire two starts back-to-back without awaiting the first. The second
+    // arrives while the first is still in its async setup window (suspended on
+    // `await scribaStreamController.initialize`), so the guard must reject it.
+    const first = session.startSession(ScribaMode.TRANSCRIBE)
+    const second = session.startSession(ScribaMode.TRANSCRIBE)
+    await Promise.all([first, second])
+
+    // Exactly one session should have been set up — no double interaction,
+    // no double recording.
+    expect(mockScribaStreamController.initialize).toHaveBeenCalledTimes(1)
+    expect(mockInteractionManager.initialize).toHaveBeenCalledTimes(1)
+    expect(mockVoiceInputService.startAudioRecording).toHaveBeenCalledTimes(1)
+    expect(
+      mockRecordingStateNotifier.notifyRecordingStarted,
+    ).toHaveBeenCalledTimes(1)
+  })
+
   test('should fetch and send context in background', async () => {
     const { ScribaSessionManager } = await import('./scribaSessionManager')
     const session = new ScribaSessionManager()
@@ -234,6 +255,14 @@ describe('scribaSessionManager', () => {
     await session.startSession(ScribaMode.TRANSCRIBE)
 
     expect(mockVoiceInputService.startAudioRecording).not.toHaveBeenCalled()
+    // The interaction created for this attempt must be rolled back so it
+    // doesn't dangle and get adopted by an unrelated future session.
+    expect(mockInteractionManager.clearCurrentInteraction).toHaveBeenCalled()
+
+    // The re-entrancy guard must be released after a failed start so the next
+    // start works normally.
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    expect(mockVoiceInputService.startAudioRecording).toHaveBeenCalledTimes(1)
   })
 
   test('should change mode during session', async () => {
