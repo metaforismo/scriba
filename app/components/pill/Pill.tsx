@@ -15,6 +15,7 @@ import { analytics, ANALYTICS_EVENTS } from '../analytics'
 import type {
   RecordingStatePayload,
   ProcessingStatePayload,
+  ErrorStatePayload,
 } from '@/lib/types/ipc'
 import { ScribaMode } from '@/app/generated/scriba_pb'
 
@@ -75,6 +76,7 @@ const Pill = () => {
   const [isRecording, setIsRecording] = useState(false)
   const [isManualRecording, setIsManualRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [errorState, setErrorState] = useState<ErrorStatePayload | null>(null)
   const [isHovered, setIsHovered] = useState(false)
   const [recordingMode, setRecordingMode] = useState<ScribaMode | undefined>()
   const isManualRecordingRef = useRef(false)
@@ -99,6 +101,11 @@ const Pill = () => {
         // Update recording state - this is for global hotkey triggered recording
         setIsRecording(state.isRecording)
         setRecordingMode(state.mode ?? recordingMode)
+
+        // A new recording supersedes any lingering error indicator
+        if (state.isRecording) {
+          setErrorState(null)
+        }
 
         // Only track general recording analytics if it's not a manual recording
         if (!isManualRecordingRef.current) {
@@ -126,6 +133,20 @@ const Pill = () => {
       'processing-state-update',
       (state: ProcessingStatePayload) => {
         setIsProcessing(state.isProcessing)
+      },
+    )
+
+    // Listen for error states so failures are visible instead of silent
+    const unsubError = window.api.on(
+      'error-state-update',
+      (payload: ErrorStatePayload) => {
+        setErrorState(payload)
+        // An error supersedes any in-flight recording/processing visuals
+        setIsProcessing(false)
+        setIsRecording(false)
+        setIsManualRecording(false)
+        isManualRecordingRef.current = false
+        setVolumeHistory([])
       },
     )
 
@@ -182,12 +203,20 @@ const Pill = () => {
     return () => {
       unsubRecording()
       unsubProcessing()
+      unsubError()
       unsubVolume()
       unsubSettings()
       unsubOnboarding()
       unsubUserAuth()
     }
   }, [volumeHistory, lastVolumeUpdate, recordingMode])
+
+  // Auto-dismiss the error indicator after a short delay
+  useEffect(() => {
+    if (!errorState) return
+    const timeout = setTimeout(() => setErrorState(null), 2600)
+    return () => clearTimeout(timeout)
+  }, [errorState])
 
   // Define dimensions for different states
   const idleWidth = 36
@@ -200,20 +229,28 @@ const Pill = () => {
   const manualRecordingHeight = 32
   const processingWidth = 84
   const processingHeight = 32
+  const errorWidth = 150
+  const errorHeight = 32
 
   // Determine current state
   const anyRecording = isRecording || isManualRecording
+  // An error should always be shown, even outside the normal display conditions.
   const shouldShow =
-    (onboardingCategory === ONBOARDING_CATEGORIES.TRY_IT ||
+    !!errorState ||
+    ((onboardingCategory === ONBOARDING_CATEGORIES.TRY_IT ||
       onboardingCompleted) &&
-    (anyRecording || isProcessing || showScribaBarAlways || isHovered)
+      (anyRecording || isProcessing || showScribaBarAlways || isHovered))
 
   // Calculate dimensions based on state
   let currentWidth = idleWidth
   let currentHeight = idleHeight
   let backgroundColor = 'rgba(128, 128, 128, 0.65)'
 
-  if (isManualRecording) {
+  if (errorState) {
+    currentWidth = errorWidth
+    currentHeight = errorHeight
+    backgroundColor = '#7f1d1d'
+  } else if (isManualRecording) {
     currentWidth = manualRecordingWidth
     currentHeight = manualRecordingHeight
     backgroundColor = '#000000'
@@ -319,6 +356,55 @@ const Pill = () => {
   }
 
   const renderContent = () => {
+    if (errorState) {
+      return (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '0 10px',
+            maxWidth: '100%',
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            style={{ flexShrink: 0 }}
+          >
+            <path
+              d="M12 3 22 20H2L12 3Z"
+              stroke="#fca5a5"
+              strokeWidth="2"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12 10v4"
+              stroke="#fca5a5"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+            <circle cx="12" cy="17" r="1" fill="#fca5a5" />
+          </svg>
+          <span
+            style={{
+              color: 'white',
+              fontSize: 12,
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {errorState.message}
+          </span>
+        </div>
+      )
+    }
+
     if (isManualRecording) {
       return (
         <div

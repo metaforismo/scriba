@@ -211,6 +211,11 @@ export class ScribaSessionManager {
 
     // Handle any transcription error
     if (response.error) {
+      // Give the user visible feedback instead of silently swallowing the failure.
+      recordingStateNotifier.notifyError(
+        this.friendlyResponseError(response.error),
+        response.error.code,
+      )
       await interactionManager.createInteraction(
         response.transcript || '',
         audioBuffer,
@@ -259,11 +264,57 @@ export class ScribaSessionManager {
       '[scribaSessionManager] An unexpected error occurred during transcription:',
       error,
     )
+    // Surface the failure to the user (network/auth/stream errors are otherwise silent).
+    recordingStateNotifier.notifyError(this.friendlyExceptionError(error))
+
     // Clear timing for the interaction on error
     timingCollector.clearInteraction()
 
     // Clear current interaction on error
     interactionManager.clearCurrentInteraction()
+  }
+
+  /** Maps a server-returned protobuf ClientError to a short user-facing message. */
+  private friendlyResponseError(error: { code?: string; message?: string }): string {
+    switch (error?.code) {
+      case 'CLIENT_NO_SPEECH_DETECTED':
+        return 'No speech detected'
+      case 'CLIENT_AUDIO_TOO_SHORT':
+        return 'Recording too short'
+      case 'CLIENT_TRANSCRIPTION_QUALITY_ERROR':
+        return "Couldn't understand audio"
+      case 'CLIENT_UNAVAILABLE':
+      case 'CLIENT_API_KEY_ERROR':
+      case 'CLIENT_MODEL_ERROR':
+        return 'Service unavailable'
+      case 'CLIENT_API_ERROR':
+        return 'Transcription failed'
+      default:
+        return error?.message || 'Transcription failed'
+    }
+  }
+
+  /** Maps a thrown exception (stream/network/auth) to a short user-facing message. */
+  private friendlyExceptionError(error: any): string {
+    const msg = (error?.message || '').toLowerCase()
+    if (
+      msg.includes('unauthenticated') ||
+      msg.includes('unauthorized') ||
+      msg.includes('401')
+    ) {
+      return 'Please sign in'
+    }
+    if (
+      msg.includes('network') ||
+      msg.includes('fetch failed') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('econnrefused') ||
+      msg.includes('unavailable') ||
+      msg.includes('timeout')
+    ) {
+      return 'Network error'
+    }
+    return 'Transcription failed'
   }
 }
 

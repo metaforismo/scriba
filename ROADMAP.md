@@ -45,7 +45,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ### P0 — Reliability & correctness (fix the silent failures first)
 - [x] **EDIT-mode LLM error pastes the raw prompt scaffold into the doc** → now throws `ClientApiError` (groq+cerebras), handled as an error response. *(iter 1)*
-- [ ] **No error/empty-state feedback in the pill.** Add an `error` state to `recordingStateNotifier` + IPC + `Pill.tsx` (no-speech / offline / API error / not-signed-in). Today the user gets **total silence** on failure. *(Biggest UX gap. Files: `lib/main/recordingStateNotifier.ts`, `lib/types/ipc.ts`, `lib/main/scribaSessionManager.ts` handleTranscriptionResponse/Error, `app/components/pill/Pill.tsx`.)*
+- [x] **No error/empty-state feedback in the pill** → added an `error-state-update` IPC channel + `notifyError()`; the session manager maps failures to short messages ("No speech detected", "Network error", "Please sign in", …) and the pill shows a red error indicator that auto-dismisses (~2.6s) and clears on the next recording. *(iter 2)*
 - [ ] **Concurrency guard on `startSession`** — hotkey + manual-record can both enter; dangling interaction ID + no audio cleanup when `streamController.initialize()` returns false. (`scribaSessionManager.ts:23-43`)
 - [ ] **`completeSession`/`cancelSession` race on `streamResponsePromise`** drops a valid transcript when two stop-signals arrive close together. (`scribaSessionManager.ts:101,131,197`)
 - [ ] **gRPC empty auth header instead of failing** → triggers refresh/logout loop instead of a clear "sign in" state. Comment claims it throws; it doesn't. (`grpcClient.ts:99-106`)
@@ -93,6 +93,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 2 — 2026-06-09
+- **Fix (P0, biggest UX gap):** dictation failures are no longer silent. Added an `error-state-update` IPC event + `ErrorStatePayload` (`lib/types/ipc.ts`), a `notifyError()` on `recordingStateNotifier`, and wired `scribaSessionManager` to call it from both error paths (server-returned protobuf `ClientError` and thrown stream/network exceptions), mapping codes to short user-facing messages. The pill (`app/components/pill/Pill.tsx`) now renders a red error state with a warning icon + message, auto-dismisses after ~2.6s, and clears when a new recording starts. Updated the session-manager test mock to include `notifyError`.
+- **Next:** P0 — concurrency guard on `startSession` (hotkey + manual-record can both enter → dangling interaction / no audio cleanup), then the `completeSession`/`cancelSession` race.
 
 ### Iteration 1 — 2026-06-09
 - Researched Wispr Flow (desktop + mobile architecture, features, weaknesses) → "How Wispr Flow works" above.

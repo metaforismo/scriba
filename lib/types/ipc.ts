@@ -4,6 +4,7 @@ import { ScribaMode } from '@/app/generated/scriba_pb'
 export const IPC_EVENTS = {
   RECORDING_STATE_UPDATE: 'recording-state-update',
   PROCESSING_STATE_UPDATE: 'processing-state-update',
+  ERROR_STATE_UPDATE: 'error-state-update',
   VOLUME_UPDATE: 'volume-update',
   FORCE_DEVICE_LIST_RELOAD: 'force-device-list-reload',
   SETTINGS_UPDATE: 'settings-update',
@@ -20,6 +21,17 @@ export interface RecordingStatePayload {
 export interface ProcessingStatePayload {
   isProcessing: boolean
   mode?: ScribaMode
+}
+
+/**
+ * Surfaced to the pill/main window when a dictation fails so the user gets
+ * visible feedback instead of silence (no speech, network/API error, etc.).
+ */
+export interface ErrorStatePayload {
+  /** Short, user-facing message, e.g. "No speech detected". */
+  message: string
+  /** Machine-readable code (e.g. CLIENT_NO_SPEECH_DETECTED) for analytics/UX. */
+  code?: string
 }
 
 export interface VolumeUpdatePayload {

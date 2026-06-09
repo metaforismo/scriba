@@ -4,6 +4,7 @@ import {
   IPC_EVENTS,
   RecordingStatePayload,
   ProcessingStatePayload,
+  ErrorStatePayload,
 } from '../types/ipc'
 
 /**
@@ -41,9 +42,21 @@ export class RecordingStateNotifier {
     })
   }
 
+  /**
+   * Notify the UI that a dictation failed so the user gets visible feedback
+   * instead of silence (no speech, network/API error, not signed in, etc.).
+   */
+  public notifyError(message: string, code?: string) {
+    console.log('[RecordingStateNotifier] Notifying error:', { message, code })
+    this.sendToWindows(IPC_EVENTS.ERROR_STATE_UPDATE, { message, code })
+  }
+
   private sendToWindows(
     event: string,
-    payload: RecordingStatePayload | ProcessingStatePayload,
+    payload:
+      | RecordingStatePayload
+      | ProcessingStatePayload
+      | ErrorStatePayload,
   ) {
     // Send to pill window
     getPillWindow()?.webContents.send(event, payload)
