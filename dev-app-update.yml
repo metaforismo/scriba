@@ -1,0 +1,6 @@
+owner: heyito
+repo: scriba
+provider: s3
+bucket: dev-scriba-releases
+path: manual-test/
+region: us-west-2
