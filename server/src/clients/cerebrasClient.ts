@@ -4,6 +4,7 @@ import {
   ClientApiKeyError,
   ClientUnavailableError,
   ClientApiError,
+  ClientError,
 } from './errors.js'
 import { ClientProvider } from './providers.js'
 import { LlmProvider } from './llmProvider.js'
@@ -77,7 +78,17 @@ class CerebrasClient implements LlmProvider {
       return (completion.choices as any)[0]?.message?.content?.trim() || ' '
     } catch (error: any) {
       console.error('An error occurred during transcript adjustment:', error)
-      return userPrompt
+      if (error instanceof ClientError) {
+        throw error
+      }
+      // Surface the failure instead of returning the raw prompt scaffold,
+      // which would otherwise be pasted into the user's document.
+      throw new ClientApiError(
+        error.message || 'An unknown error occurred',
+        ClientProvider.CEREBRAS,
+        error,
+        error.status || error.statusCode,
+      )
     }
   }
 

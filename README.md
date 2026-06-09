@@ -1,5 +1,3 @@
-# [DEPRECATED] - This project is no longer maintained 
-
 # Scriba
 
 <div align="center">
