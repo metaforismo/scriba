@@ -127,6 +127,17 @@ export class ScribaSessionManager {
     const responsePromise = this.streamResponsePromise
     this.streamResponsePromise = null
 
+    // If another stop (a completeSession, or a duplicate cancel) already took
+    // ownership of this session, do nothing. Re-running teardown here could
+    // cancel an in-flight transcription that completeSession is about to handle
+    // (dropping a valid transcript) or double-stop the recorder.
+    if (!responsePromise) {
+      console.log(
+        '[scribaSessionManager] cancelSession ignored: no active session to cancel',
+      )
+      return
+    }
+
     // Clear timing for the interaction on cancel
     timingCollector.clearInteraction()
 
@@ -155,6 +166,16 @@ export class ScribaSessionManager {
     // Capture the promise in a local variable immediately so new sessions can start
     const responsePromise = this.streamResponsePromise
     this.streamResponsePromise = null
+
+    // If another stop already took ownership of this session (a duplicate
+    // completeSession, or a cancel that already handled it), do nothing —
+    // re-running teardown would re-end the stream and toggle the UI twice.
+    if (!responsePromise) {
+      console.warn(
+        '[scribaSessionManager] completeSession ignored: no active session to complete',
+      )
+      return
+    }
 
     // End timing for the interaction
     timingCollector.endTiming(TimingEventName.INTERACTION_ACTIVE)

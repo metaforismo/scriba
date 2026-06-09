@@ -47,7 +47,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 - [x] **EDIT-mode LLM error pastes the raw prompt scaffold into the doc** → now throws `ClientApiError` (groq+cerebras), handled as an error response. *(iter 1)*
 - [x] **No error/empty-state feedback in the pill** → added an `error-state-update` IPC channel + `notifyError()`; the session manager maps failures to short messages ("No speech detected", "Network error", "Please sign in", …) and the pill shows a red error indicator that auto-dismisses (~2.6s) and clears on the next recording. *(iter 2)*
 - [x] **Concurrency guard on `startSession`** → re-entrancy flag held during the async setup window (released in `finally`, so a lost key-up can't lock out future sessions) + rollback of the created interaction when `initialize()` returns false. Prevents the hotkey + manual-pill double-start desync. *(iter 3)*
-- [ ] **`completeSession`/`cancelSession` race on `streamResponsePromise`** drops a valid transcript when two stop-signals arrive close together. (`scribaSessionManager.ts:101,131,197`)
+- [x] **`completeSession`/`cancelSession` race on `streamResponsePromise`** → whoever captures the (non-null) promise owns teardown; the second stop now no-ops instead of cancelling the in-flight transcription / double-stopping audio. Prevents dropped transcripts when a cancel lands right after a complete. *(iter 4)*
 - [ ] **gRPC empty auth header instead of failing** → triggers refresh/logout loop instead of a clear "sign in" state. Comment claims it throws; it doesn't. (`grpcClient.ts:99-106`)
 - [ ] **Retry/queue on network failure** — a failed dictation is currently lost forever. Add 1 retry + clipboard fallback (copy Wispr's graceful-degradation pattern).
 - [ ] **Key-listener restart orphans in-flight session** (recording continues, no key-up). Reconcile `pressedKeys`/`activeShortcutId` on restart. (`keyboard.ts:88-95`)
@@ -93,6 +93,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 4 — 2026-06-09
+- **Fix (P0 race):** `completeSession`/`cancelSession` now guard on ownership of `streamResponsePromise`. Each captures-and-nulls the promise synchronously; if it captured `null`, another stop already owns the session, so it no-ops instead of running teardown again. This stops a `cancel` that races a `complete` from aborting the in-flight transcription (dropping a valid transcript), and stops duplicate stops from double-ending the stream / toggling the UI. Added a race test (cancel-after-complete keeps the transcript) and a duplicate-complete no-op test; fixed the existing cancel test to start a session first and added the missing `clearInteractionAudio` mock.
+- **Next:** P0 — gRPC empty-auth-header: `grpcClient.getHeaders()` returns empty headers when the token is null (comment claims it throws), causing a refresh/logout loop instead of a clear "please sign in" state.
 
 ### Iteration 3 — 2026-06-09
 - **Fix (P0 race):** added a re-entrancy guard to `scribaSessionManager.startSession`. A boolean `isStarting` is set synchronously at entry and released in `finally`, so two near-simultaneous starts (hotkey racing the manual pill click, or a rapid re-press) can no longer create two interactions / two recordings for one dictation. On the `initialize() === false` path it now rolls back the interaction it created (was left dangling). Because the flag is only held during setup, a lost key-up can't permanently lock out future sessions. Added a concurrency unit test + extended the controller-fail test (rollback + guard-release).

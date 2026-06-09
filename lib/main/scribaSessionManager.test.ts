@@ -43,6 +43,7 @@ const mockScribaStreamController = {
   getAudioDurationMs: mock(() => 1000),
   endInteraction: mock(),
   cancelTranscription: mock(),
+  clearInteractionAudio: mock(),
 }
 mock.module('./scribaStreamController', () => ({
   scribaStreamController: mockScribaStreamController,
@@ -281,11 +282,55 @@ describe('scribaSessionManager', () => {
     const { ScribaSessionManager } = await import('./scribaSessionManager')
     const session = new ScribaSessionManager()
 
+    await session.startSession(ScribaMode.TRANSCRIBE)
     await session.cancelSession()
 
     expect(mockScribaStreamController.cancelTranscription).toHaveBeenCalled()
     expect(mockVoiceInputService.stopAudioRecording).toHaveBeenCalled()
     expect(mockRecordingStateNotifier.notifyRecordingStopped).toHaveBeenCalled()
+  })
+
+  test('should ignore a cancel that races a complete (no dropped transcript)', async () => {
+    const mockTranscript = 'racing transcript'
+    mockScribaStreamController.startGrpcStream.mockResolvedValueOnce({
+      response: { transcript: mockTranscript },
+      audioBuffer: Buffer.from('audio-data'),
+      sampleRate: 16000,
+    })
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+
+    // completeSession synchronously claims the response promise; a cancel that
+    // races in right after must be a no-op and must NOT abort the in-flight
+    // transcription.
+    const completing = session.completeSession()
+    await session.cancelSession()
+    await completing
+
+    expect(mockScribaStreamController.cancelTranscription).not.toHaveBeenCalled()
+    expect(mockTextInserter.insertText).toHaveBeenCalledWith(mockTranscript)
+  })
+
+  test('should ignore a duplicate completeSession', async () => {
+    mockScribaStreamController.startGrpcStream.mockResolvedValueOnce({
+      response: { transcript: 'once' },
+      audioBuffer: Buffer.from('audio-data'),
+      sampleRate: 16000,
+    })
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await session.completeSession()
+    await session.completeSession() // duplicate — must be a no-op
+
+    // endInteraction + text insertion happen exactly once, not twice.
+    expect(mockScribaStreamController.endInteraction).toHaveBeenCalledTimes(1)
+    expect(mockTextInserter.insertText).toHaveBeenCalledTimes(1)
   })
 
   test('should complete session with sufficient audio', async () => {
