@@ -16,13 +16,18 @@ import {
   createUserPromptWithContext,
   detectScribaMode,
   getPromptForMode,
+  resolveNumberInRange,
 } from './helpers.js'
+import {
+  LLMTemperatureSchema,
+  NoSpeechThresholdSchema,
+  type TranscriptCleanupLevel,
+} from '../../validation/schemas.js'
 import {
   SCRIBA_MODE_SYSTEM_PROMPT,
   TRANSCRIPT_CLEANUP_PROMPT,
   TRANSCRIPT_CLEANUP_SYSTEM_PROMPT,
 } from './constants.js'
-import type { TranscriptCleanupLevel } from '../../validation/schemas.js'
 import type { ScribaContext } from './types.js'
 import { isAbortError, createAbortError } from '../../utils/abortUtils.js'
 import {
@@ -315,7 +320,8 @@ export class TranscribeStreamV2Handler {
         mergedConfig.llmSettings?.asrProvider,
         DEFAULT_ADVANCED_SETTINGS.asrProvider,
       ),
-      noSpeechThreshold: this.resolveOrDefault(
+      noSpeechThreshold: resolveNumberInRange(
+        NoSpeechThresholdSchema,
         mergedConfig.llmSettings?.noSpeechThreshold,
         DEFAULT_ADVANCED_SETTINGS.noSpeechThreshold,
       ),
@@ -364,7 +370,8 @@ export class TranscribeStreamV2Handler {
         mergedConfig.llmSettings?.llmModel,
         DEFAULT_ADVANCED_SETTINGS.llmModel,
       ),
-      llmTemperature: this.resolveOrDefault(
+      llmTemperature: resolveNumberInRange(
+        LLMTemperatureSchema,
         mergedConfig.llmSettings?.llmTemperature,
         DEFAULT_ADVANCED_SETTINGS.llmTemperature,
       ),

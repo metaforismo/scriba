@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'bun:test'
-import { detectScribaMode, getScribaMode } from './helpers.js'
+import {
+  detectScribaMode,
+  getScribaMode,
+  resolveNumberInRange,
+} from './helpers.js'
+import {
+  LLMTemperatureSchema,
+  NoSpeechThresholdSchema,
+} from '../../validation/schemas.js'
 import { ScribaMode } from '../../generated/scriba_pb.js'
 
 describe('detectScribaMode', () => {
@@ -68,5 +76,29 @@ describe('getScribaMode', () => {
     expect(getScribaMode('edit')).toBeUndefined()
     expect(getScribaMode(undefined)).toBeUndefined()
     expect(getScribaMode(NaN)).toBeUndefined()
+  })
+})
+
+describe('resolveNumberInRange', () => {
+  it('keeps in-range LLM temperature values (0–2)', () => {
+    expect(resolveNumberInRange(LLMTemperatureSchema, 0.7, 0.1)).toBe(0.7)
+    expect(resolveNumberInRange(LLMTemperatureSchema, 0, 0.1)).toBe(0)
+    expect(resolveNumberInRange(LLMTemperatureSchema, 2, 0.1)).toBe(2)
+  })
+
+  it('falls back to default for out-of-range temperature', () => {
+    expect(resolveNumberInRange(LLMTemperatureSchema, 9999, 0.1)).toBe(0.1)
+    expect(resolveNumberInRange(LLMTemperatureSchema, -1, 0.1)).toBe(0.1)
+  })
+
+  it('keeps in-range no-speech threshold values (0–1) and clamps the rest', () => {
+    expect(resolveNumberInRange(NoSpeechThresholdSchema, 0.6, 0.6)).toBe(0.6)
+    expect(resolveNumberInRange(NoSpeechThresholdSchema, 1.5, 0.6)).toBe(0.6)
+    expect(resolveNumberInRange(NoSpeechThresholdSchema, -0.2, 0.6)).toBe(0.6)
+  })
+
+  it('falls back to default for null/undefined', () => {
+    expect(resolveNumberInRange(LLMTemperatureSchema, undefined, 0.1)).toBe(0.1)
+    expect(resolveNumberInRange(NoSpeechThresholdSchema, null, 0.6)).toBe(0.6)
   })
 })

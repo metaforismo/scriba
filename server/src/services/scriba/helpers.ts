@@ -152,6 +152,23 @@ const VALID_SCRIBA_MODES = new Set(
   ),
 )
 
+/**
+ * Returns `value` only if it passes the given schema's range check; otherwise
+ * the default. Used to defend the V2 stream path against an untrusted client
+ * sending out-of-range numbers (e.g. temperature 9999, noSpeechThreshold -1)
+ * that would degrade or break the ASR/LLM providers.
+ */
+export function resolveNumberInRange(
+  schema: { safeParse: (value: unknown) => { success: boolean } },
+  value: number | undefined | null,
+  defaultValue: number,
+): number {
+  if (value === undefined || value === null) {
+    return defaultValue
+  }
+  return schema.safeParse(value).success ? value : defaultValue
+}
+
 export function getScribaMode(input: unknown): ScribaMode | undefined {
   const inputNumber = Number(input)
   // Reject NaN/Infinity *and* in-range-looking numbers that aren't real enum
