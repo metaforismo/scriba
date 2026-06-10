@@ -6,6 +6,7 @@ import SwiftUI
 struct KeyboardView: View {
     @ObservedObject var dictation: DictationController
     @ObservedObject var recorder: AudioRecorder
+    @ObservedObject var context: KeyboardContext
 
     var needsInputModeSwitch: Bool
     var onAdvanceKeyboard: () -> Void
@@ -15,14 +16,47 @@ struct KeyboardView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            statusLine
-            micButton
+            if context.fieldMode == .voice {
+                statusLine
+                micButton
+            } else {
+                fallbackView
+            }
             utilityRow
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity)
         .background(Color(white: 0.13))
+    }
+
+    // MARK: - Fallback (numeric / secure fields)
+
+    private var fallbackView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: context.fieldMode == .secure ? "lock.fill" : "number")
+                .font(.system(size: 22))
+                .foregroundColor(.white.opacity(0.8))
+            Text(
+                context.fieldMode == .secure
+                    ? "Use the system keyboard for secure fields"
+                    : "Use the system keyboard for numbers"
+            )
+            .font(.footnote)
+            .foregroundColor(.white.opacity(0.7))
+            .multilineTextAlignment(.center)
+            Button(action: onAdvanceKeyboard) {
+                Label("Switch keyboard", systemImage: "globe")
+                    .font(.footnote.weight(.medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor)
+                    .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(height: 96)
     }
 
     // MARK: - Status
