@@ -16,9 +16,25 @@ struct SettingsView: View {
                             .foregroundStyle(.green)
                         Button("Sign out", role: .destructive) { auth.signOut() }
                     } else {
-                        // TODO: replace with the real Auth0 flow (see ios/README.md).
-                        SecureField("Developer access token", text: $devToken)
-                        Button("Sign in") {
+                        if auth.isAuth0Configured {
+                            Button {
+                                Task { await auth.signIn() }
+                            } label: {
+                                Label("Sign in", systemImage: "person.crop.circle")
+                            }
+                        }
+                        if let error = auth.errorMessage {
+                            Text(error)
+                                .font(.footnote)
+                                .foregroundStyle(.red)
+                        }
+                    }
+                }
+
+                if !auth.isSignedIn {
+                    Section("Developer") {
+                        SecureField("Paste access token", text: $devToken)
+                        Button("Use token") {
                             auth.signIn(devToken: devToken)
                             devToken = ""
                         }
