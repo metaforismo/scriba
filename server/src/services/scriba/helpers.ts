@@ -144,25 +144,37 @@ export function getAdvancedSettingsHeaders(headers: Headers) {
   }
 }
 
-export function getScribaMode(input: unknown): ScribaMode | undefined {
-  try {
-    const inputNumber = Number(input)
-    if (isNaN(inputNumber) || !Number.isFinite(inputNumber)) {
-      return undefined
-    }
+// Numeric values that are actually members of the ScribaMode enum, derived from
+// the generated enum so it stays correct if modes are added.
+const VALID_SCRIBA_MODES = new Set(
+  Object.values(ScribaMode).filter(
+    (value): value is number => typeof value === 'number',
+  ),
+)
 
-    return inputNumber as ScribaMode
-  } catch (error) {
-    console.error('Error parsing Scriba mode:', error)
+export function getScribaMode(input: unknown): ScribaMode | undefined {
+  const inputNumber = Number(input)
+  // Reject NaN/Infinity *and* in-range-looking numbers that aren't real enum
+  // members (e.g. "7"), which would otherwise index SCRIBA_MODE_PROMPT[mode] as
+  // undefined downstream.
+  if (!Number.isFinite(inputNumber) || !VALID_SCRIBA_MODES.has(inputNumber)) {
     return undefined
   }
+  return inputNumber as ScribaMode
 }
 
-export function detectScribaMode(transcript: string): ScribaMode {
-  const words = transcript.trim().split(/\s+/)
-  const firstFiveWords = words.slice(0, 5).join(' ').toLowerCase()
+// The "hey scriba" command wake phrase, accepted only at the START of the
+// utterance (a wake word is always spoken first). Tolerates leading
+// punctuation/whitespace, a comma or space between the two words, and the most
+// common ASR mishearings of "scriba" (scribe / scribah / scribba). Anchoring to
+// the start avoids false EDIT triggers when the phrase lands mid-dictation,
+// e.g. "I told him hey Scriba is great".
+const COMMAND_WAKE_PHRASE = /^[\s,.!?-]*hey[\s,]+scri(?:ba|be|bah|bba|bbah)\b/i
 
-  return firstFiveWords.includes('hey scriba') ? ScribaMode.EDIT : ScribaMode.TRANSCRIBE
+export function detectScribaMode(transcript: string): ScribaMode {
+  return COMMAND_WAKE_PHRASE.test(transcript.trim())
+    ? ScribaMode.EDIT
+    : ScribaMode.TRANSCRIBE
 }
 
 export function getPromptForMode(
