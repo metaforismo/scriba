@@ -194,6 +194,19 @@ export function detectScribaMode(transcript: string): ScribaMode {
     : ScribaMode.TRANSCRIBE
 }
 
+/**
+ * Removes a leading "hey scriba" wake phrase (plus the punctuation after it) so
+ * the EDIT-mode LLM receives just the user's command, not the wake word. A no-op
+ * when the phrase isn't present (e.g. EDIT triggered by an explicit hotkey).
+ * Falls back to the original transcript if stripping would leave it empty.
+ */
+export function stripScribaWakePhrase(transcript: string): string {
+  const stripped = transcript
+    .replace(COMMAND_WAKE_PHRASE, '')
+    .replace(/^[\s,.:;!?-]+/, '')
+  return stripped.trim().length > 0 ? stripped : transcript
+}
+
 export function getPromptForMode(
   mode: ScribaMode,
   advancedSettingsHeaders: ReturnType<typeof getAdvancedSettingsHeaders>,

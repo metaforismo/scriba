@@ -3,6 +3,7 @@ import {
   detectScribaMode,
   getScribaMode,
   resolveNumberInRange,
+  stripScribaWakePhrase,
 } from './helpers.js'
 import {
   LLMTemperatureSchema,
@@ -56,6 +57,28 @@ describe('detectScribaMode', () => {
     )
     expect(detectScribaMode('')).toBe(ScribaMode.TRANSCRIBE)
     expect(detectScribaMode('   ')).toBe(ScribaMode.TRANSCRIBE)
+  })
+})
+
+describe('stripScribaWakePhrase', () => {
+  it('removes a leading wake phrase and its trailing punctuation', () => {
+    expect(stripScribaWakePhrase('Hey Scriba, make this more formal')).toBe(
+      'make this more formal',
+    )
+    expect(stripScribaWakePhrase('hey scriba summarize this')).toBe(
+      'summarize this',
+    )
+    expect(stripScribaWakePhrase('Hey Scribe: translate it')).toBe('translate it')
+  })
+
+  it('leaves a transcript without the wake phrase unchanged', () => {
+    expect(stripScribaWakePhrase('just transcribe this')).toBe(
+      'just transcribe this',
+    )
+  })
+
+  it('falls back to the original when stripping would leave nothing', () => {
+    expect(stripScribaWakePhrase('Hey Scriba')).toBe('Hey Scriba')
   })
 })
 

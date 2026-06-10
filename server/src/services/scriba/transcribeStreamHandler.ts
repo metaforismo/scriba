@@ -26,6 +26,7 @@ import {
   getAdvancedSettingsHeaders,
   getScribaMode,
   getPromptForMode,
+  stripScribaWakePhrase,
 } from './helpers.js'
 import { SCRIBA_MODE_SYSTEM_PROMPT } from './constants.js'
 import type { ScribaContext } from './types.js'
@@ -157,7 +158,10 @@ export class TranscribeStreamHandler {
         detectedMode,
         advancedSettingsHeaders,
       )
-      const userPrompt = createUserPromptWithContext(transcript, windowContext)
+      const userPrompt = createUserPromptWithContext(
+        stripScribaWakePhrase(transcript),
+        windowContext,
+      )
 
       console.log(
         `[${new Date().toISOString()}] Detected mode: ${detectedMode}, adjusting transcript`,

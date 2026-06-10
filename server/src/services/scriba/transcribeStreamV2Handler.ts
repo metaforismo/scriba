@@ -17,6 +17,7 @@ import {
   detectScribaMode,
   getPromptForMode,
   resolveNumberInRange,
+  stripScribaWakePhrase,
 } from './helpers.js'
 import {
   LLMTemperatureSchema,
@@ -429,7 +430,11 @@ export class TranscribeStreamV2Handler {
     }
 
     const userPromptPrefix = getPromptForMode(mode, advancedSettings)
-    const userPrompt = createUserPromptWithContext(transcript, windowContext)
+    // Strip a leading "hey scriba" so the LLM gets the command, not the wake word.
+    const userPrompt = createUserPromptWithContext(
+      stripScribaWakePhrase(transcript),
+      windowContext,
+    )
     const llmProvider = getLlmProvider(advancedSettings.llmProvider)
 
     const adjustedTranscript = await serverTimingCollector.timeAsync(
