@@ -95,6 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 19 — 2026-06-10
+- **Fix (P2/P4, server):** both LLM providers returned a lone space `' '` on empty output ("to enable emptying the document"). That never worked (the text inserter rejects whitespace), and since the iter-6 clipboard fallback it actively produced a confusing "Insert failed — copied to clipboard" (with a space on the clipboard) for an empty EDIT result. Now they return `''`: the desktop cleanly **skips insertion** for an empty transcript, and the cleanup pass was already guarded against empty output. groq + cerebras; updated the groq test. Server suite green.
+- **Next:** iOS live streaming (big), or more testable desktop/server fixes / a Wispr-style desktop feature (double-tap hands-free, cancel-on-Escape).
+
 ### Iteration 18 — 2026-06-10 (back to testable: Whisper prompt)
 - **Fix (P4, server):** the Whisper transcription-prompt builder char-sliced the vocabulary then regex-stripped a partial last term — which could over-truncate (drop a complete term) or leave a fragment for a single over-long term; and `chars/4` badly underestimates non-ASCII (CJK/accented) text, so a vocab that "fit" by that estimate could silently overflow the 224-token cap and degrade transcription. Now truncates by **whole terms** (keeps as many complete terms as fit, never mid-term) and `estimateTokenCount` counts non-ASCII chars near 1 token each (conservative). +2 tests; existing behavior preserved; server suite green (13 files).
 - **Next:** iOS live streaming (big), or more testable desktop/server fixes (e.g. revisit the EDIT `' '` empty-output sentinel, mode-detection commands).
