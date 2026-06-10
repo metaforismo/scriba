@@ -12,6 +12,7 @@
   <p>
     <img alt="macOS" src="https://img.shields.io/badge/macOS-supported-blue?logo=apple&logoColor=white">
     <img alt="Windows" src="https://img.shields.io/badge/Windows-supported-blue?logo=windows&logoColor=white">
+    <img alt="iOS" src="https://img.shields.io/badge/iOS-keyboard%20(beta)-blue?logo=apple&logoColor=white">
     <img alt="Version" src="https://img.shields.io/badge/version-0.2.3-green">
     <img alt="License" src="https://img.shields.io/badge/license-GPL-blue">
   </p>
@@ -251,6 +252,17 @@ bun run lint:fix           # Fix linting issues
 ```
 
 ---
+
+## 📱 Mobile (iOS)
+
+A native Swift **dictation keyboard** for iOS lives in [`ios/`](./ios) — Wispr-Flow
+style: hold the 🌐 globe, switch to Scriba, tap the 🎙 mic, speak, and your words
+are inserted into any app. It records a short utterance, sends it to the server's
+`POST /v1/transcribe` endpoint, and inserts the transcript at the cursor.
+
+It's an early **foundation** (built with XcodeGen; container app + keyboard
+extension + shared layer). See [`ios/README.md`](./ios/README.md) for setup and
+the remaining work (real Auth0 sign-in, live streaming, on-device testing).
 
 ## 🏗️ Architecture
 
