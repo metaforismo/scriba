@@ -95,6 +95,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 21 — 2026-06-10
+- **Fix (P1, desktop):** context (window, app, and the **selected text**) was only gathered once at `startSession` in TRANSCRIBE mode, so switching into EDIT mid-session (a different hotkey) ran the LLM rewrite with stale/empty context — EDIT couldn't see the selection. `setMode` now re-fetches context when switching into EDIT. +2 tests; full lib suite green.
+- **(Considered + rejected this round:** double-tap hands-free — it changes the core push-to-talk behavior (a sub-threshold tap would become hands-free) and breaks the synchronous-timing tests; too risky without real-app testing.)
+- **Next:** iOS live streaming (big), or more testable Wispr-parity fixes.
+
 ### Iteration 20 — 2026-06-10 (desktop: cancel-on-Escape)
 - **Feat (desktop, Wispr-style):** pressing **Escape during a dictation discards it** (`cancelSession`) instead of transcribing. Since the hotkey is usually still held, a `dictationSuppressed` flag stops the still-pressed combo from instantly re-triggering; it clears once all keys are released (fresh press dictates again). Escape when idle is a no-op. +4 tests; full lib suite green.
 - **Next:** iOS live streaming (big), or more Wispr-style desktop features (double-tap hands-free toggle) / testable fixes.
