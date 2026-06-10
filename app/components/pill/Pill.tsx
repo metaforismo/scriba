@@ -89,9 +89,11 @@ const Pill = () => {
   const [onboardingCompleted, setOnboardingCompleted] = useState(
     initialOnboardingCompleted,
   )
-  // Fixed size array of volume values to be used for the audio bars, size is 21
+  // Rolling window of recent volume values driving the audio bars (capped below).
   const [volumeHistory, setVolumeHistory] = useState<number[]>([])
-  const [lastVolumeUpdate, setLastVolumeUpdate] = useState(0)
+  // Throttle timestamp lives in a ref, not state: it must not trigger a re-render
+  // (or, worse, re-run the IPC subscription effect) on every audio frame.
+  const lastVolumeUpdateRef = useRef(0)
 
   useEffect(() => {
     // Listen for recording state changes from the main process
@@ -100,7 +102,11 @@ const Pill = () => {
       (state: RecordingStatePayload) => {
         // Update recording state - this is for global hotkey triggered recording
         setIsRecording(state.isRecording)
-        setRecordingMode(state.mode ?? recordingMode)
+        // Keep the last known mode when a payload omits it (e.g. the stop event),
+        // so the processing animation keeps the right color. Functional updater so
+        // this callback doesn't close over `recordingMode` (which would force the
+        // whole subscription effect to re-run on every mode change).
+        setRecordingMode(prev => state.mode ?? prev)
 
         // A new recording supersedes any lingering error indicator
         if (state.isRecording) {
@@ -152,17 +158,20 @@ const Pill = () => {
 
     // Listen for volume updates from the main process
     const unsubVolume = window.api.on('volume-update', (vol: number) => {
-      // throttle the volume updates to 80ms
+      // Throttle to one update per BAR_UPDATE_INTERVAL ms.
       const now = Date.now()
-      if (now - lastVolumeUpdate < BAR_UPDATE_INTERVAL) {
+      if (now - lastVolumeUpdateRef.current < BAR_UPDATE_INTERVAL) {
         return
       }
-      const newVolumeHistory = [...volumeHistory, vol]
-      if (newVolumeHistory.length > 42) {
-        newVolumeHistory.shift()
-      }
-      setVolumeHistory(newVolumeHistory)
-      setLastVolumeUpdate(now)
+      lastVolumeUpdateRef.current = now
+      // Functional updater so the callback doesn't depend on `volumeHistory`.
+      setVolumeHistory(prev => {
+        const next = [...prev, vol]
+        if (next.length > 42) {
+          next.shift()
+        }
+        return next
+      })
     })
 
     // Listen for settings updates from the main process
@@ -209,7 +218,11 @@ const Pill = () => {
       unsubOnboarding()
       unsubUserAuth()
     }
-  }, [volumeHistory, lastVolumeUpdate, recordingMode])
+    // Mount-only: every callback uses stable setters/refs/functional updaters, so
+    // the IPC subscriptions are registered once instead of being torn down and
+    // re-registered on every audio frame (which dropped volume events).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Auto-dismiss the error indicator after a short delay
   useEffect(() => {
