@@ -98,9 +98,15 @@ class GrpcClient {
 
   private getHeaders() {
     if (!this.authToken) {
-      // Though we have guards elsewhere, this is a final check.
-      // Throwing here helps us pinpoint auth issues during development.
-      return new Headers()
+      // Fail fast with a recognizable Unauthenticated error instead of sending an
+      // empty Authorization header. withRetry()/handleAuthError() catch this and run
+      // the exact same recovery the server's 401 would have triggered — attempt a
+      // token refresh, then either retry the call or sign the user out — but without
+      // the wasted network round-trip. If refresh fails, the error propagates and the
+      // UI maps it to "Please sign in" (see friendlyExceptionError). Previously this
+      // returned empty headers, which caused an authless request, a guaranteed 401,
+      // and a refresh/logout loop on every call while signed out.
+      throw new ConnectError('Not authenticated', Code.Unauthenticated)
     }
     return new Headers({ Authorization: `Bearer ${this.authToken}` })
   }

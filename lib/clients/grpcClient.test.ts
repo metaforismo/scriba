@@ -306,23 +306,46 @@ describe('GrpcClient Business Logic Tests', () => {
   })
 
   describe('Authentication', () => {
-    test('should handle operations with no auth token gracefully', async () => {
+    const testNote = {
+      id: 'note-123',
+      content: 'Test note',
+      interaction_id: null,
+      user_id: 'test-user',
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z',
+      deleted_at: null,
+    }
+
+    test('with no auth token, refreshes and retries instead of sending an authless request', async () => {
       const { grpcClient } = await import('./grpcClient')
       grpcClient.setAuthToken(null)
+      mockEnsureValidTokens.mockResolvedValueOnce({
+        success: true,
+        tokens: { access_token: 'refreshed-token' },
+      })
 
-      const testNote = {
-        id: 'note-123',
-        content: 'Test note',
-        interaction_id: null,
-        user_id: 'test-user',
-        created_at: '2024-01-01T00:00:00.000Z',
-        updated_at: '2024-01-01T00:00:00.000Z',
-        deleted_at: null,
-      }
-
-      // Should proceed with operation (empty headers but no crash)
+      // getHeaders() throws Unauthenticated locally, handleAuthError refreshes,
+      // and the operation is retried successfully — the server call still fires once.
       const result = await grpcClient.createNote(testNote)
       expect(result).toBeDefined()
+      expect(mockEnsureValidTokens).toHaveBeenCalled()
+      expect(mockGrpcClientMethods.createNote).toHaveBeenCalledTimes(1)
+    })
+
+    test('with no auth token and a failed refresh, fails fast without hitting the server', async () => {
+      const { grpcClient } = await import('./grpcClient')
+      grpcClient.setAuthToken(null)
+      grpcClient.setMainWindow(mockElectronWindow)
+      mockEnsureValidTokens.mockResolvedValueOnce({ success: false } as any)
+
+      // No token + refresh fails: the call rejects with Unauthenticated and the
+      // server method is never invoked (no wasted authless round-trip).
+      await expect(grpcClient.createNote(testNote)).rejects.toThrow()
+      expect(mockGrpcClientMethods.createNote).not.toHaveBeenCalled()
+      // The user is signed out so the UI can prompt a re-login.
+      expect(mockElectronWindow.webContents.send).toHaveBeenCalledWith(
+        'auth-token-expired',
+      )
     })
 
     test('should handle auth errors gracefully when window is destroyed', async () => {
