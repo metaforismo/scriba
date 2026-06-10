@@ -95,6 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 20 — 2026-06-10 (desktop: cancel-on-Escape)
+- **Feat (desktop, Wispr-style):** pressing **Escape during a dictation discards it** (`cancelSession`) instead of transcribing. Since the hotkey is usually still held, a `dictationSuppressed` flag stops the still-pressed combo from instantly re-triggering; it clears once all keys are released (fresh press dictates again). Escape when idle is a no-op. +4 tests; full lib suite green.
+- **Next:** iOS live streaming (big), or more Wispr-style desktop features (double-tap hands-free toggle) / testable fixes.
+
 ### Iteration 19 — 2026-06-10
 - **Fix (P2/P4, server):** both LLM providers returned a lone space `' '` on empty output ("to enable emptying the document"). That never worked (the text inserter rejects whitespace), and since the iter-6 clipboard fallback it actively produced a confusing "Insert failed — copied to clipboard" (with a space on the clipboard) for an empty EDIT result. Now they return `''`: the desktop cleanly **skips insertion** for an empty transcript, and the cleanup pass was already guarded against empty output. groq + cerebras; updated the groq test. Server suite green.
 - **Next:** iOS live streaming (big), or more testable desktop/server fixes / a Wispr-style desktop feature (double-tap hands-free, cancel-on-Escape).
