@@ -30,22 +30,24 @@ const MainApp = () => {
   const shouldEnableShortcutGlobally =
     onboardingCompleted || onboardingSetupCompleted
 
-  // If authenticated and onboarding completed, show main app
-  if (isAuthenticated && onboardingCompleted) {
+  // Persist the global-shortcut-enabled flag as a side effect, only when the
+  // value actually changes. Previously this `window.api.send` ran *during render*
+  // in both branches, firing on every render (and twice under React 18 Strict
+  // Mode) — spamming the main process and racing the store write.
+  useEffect(() => {
     window.api.send(
       'electron-store-set',
       'settings.isShortcutGloballyEnabled',
       shouldEnableShortcutGlobally,
     )
+  }, [shouldEnableShortcutGlobally])
+
+  // If authenticated and onboarding completed, show main app
+  if (isAuthenticated && onboardingCompleted) {
     return <HomeKit />
   }
 
   // If authenticated but onboarding not completed, continue onboarding
-  window.api.send(
-    'electron-store-set',
-    'settings.isShortcutGloballyEnabled',
-    shouldEnableShortcutGlobally,
-  )
   return <WelcomeKit />
 }
 

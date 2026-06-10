@@ -218,10 +218,10 @@ export default function AdvancedSettingsContent() {
   const getDisplayValue = useCallback(
     (key: keyof LlmSettings): string | number | null => {
       const value = llm[key]
-      if (value === null && defaults) {
+      if ((value === null || value === undefined) && defaults) {
         return defaults[key] ?? null
       }
-      return value
+      return value ?? null
     },
     [llm, defaults],
   )
@@ -250,7 +250,13 @@ export default function AdvancedSettingsContent() {
           grammarServiceEnabled: nextGrammarEnabled,
           macosAccessibilityContextEnabled: nextMacosAccessibilityEnabled,
         }
-        await window.api.updateAdvancedSettings(settingsToSave)
+        // Catch so a failed save doesn't become an unhandled promise rejection
+        // (the setTimeout callback has no caller to await/catch it).
+        try {
+          await window.api.updateAdvancedSettings(settingsToSave)
+        } catch (error) {
+          console.error('Failed to save advanced settings:', error)
+        }
       }, 1000)
     },
     [],
