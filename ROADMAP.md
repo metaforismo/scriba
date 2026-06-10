@@ -67,9 +67,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 - [ ] **Multilingual + auto language detect** surfaced in settings (Whisper already auto-detects; no UI).
 - [ ] **Privacy-safe app-context formatting** (on-device active-window text, loudly disclosed, toggleable).
 
-### P3 — Mobile (new platforms — needs product decisions 🔒)
-- 🔒 **Decide stack**: native (Swift/Kotlin) vs React Native/Expo. Desktop is Electron/React/TS; sharing the gRPC client + proto across RN is attractive. **Needs user decision before building.**
-- [ ] **iOS**: keyboard extension w/ Full Access; mic + live waveform; auto-fallback for number/phone/email fields; <1 min setup. Don't break repeat-dictation/external keyboards (their App Store complaint).
+### P3 — Mobile (new platforms)
+- [x] **Stack decided: native iOS (Swift)** — user chose native iOS. Started in `ios/` (XcodeGen: container app + keyboard extension + shared layer). *(PR #1, iter 13)*
+- [~] **iOS**: keyboard extension w/ Full Access + mic + live waveform + record→`/v1/transcribe`→insert is **scaffolded** (PR #1). Remaining: real Auth0 sign-in, live streaming/interim results, auto-fallback for number/phone/email fields, app icon/assets, on-device testing. Don't break repeat-dictation/external keyboards (their App Store complaint).
 - [ ] **Android**: floating-bubble overlay (don't replace Gboard); Accessibility direct-insert + clipboard fallback; tap-toggle + press-hold; OEM background-kill onboarding.
 - [ ] **Free unlimited mobile tier** as a land-grab (Wispr did this on Android).
 - [ ] Reuse server: the gRPC `ScribaService.TranscribeStreamV2` + auth already exist; mobile clients can target the same backend.
@@ -94,6 +94,14 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 13 — 2026-06-10 (mobile track started — native iOS) — PR #1
+- **Decision:** user chose **native iOS (Swift)**. Mobile stack is no longer blocked.
+- **Feat (P3):** scaffolded a Wispr-Flow-style **iOS dictation keyboard** under `ios/` (XcodeGen-managed; `project.yml`). Container app (SwiftUI onboarding to enable the keyboard + mic permission + settings) and a **keyboard extension** (`UIInputViewController` hosting a SwiftUI keyboard — mic button, live waveform, globe/space/delete/return; `AVAudioEngine` → 16 kHz mono WAV; record→transcribe→insert state machine; `RequestsOpenAccess` for mic+network). Shared layer: configurable backend URL (not hardcoded to prod), shared-Keychain token store (app ⇄ keyboard), cleanup level, transcription client.
+- **Backend:** added `POST /v1/transcribe` — an authenticated record-then-transcribe endpoint for the keyboard (base64 audio → transcript; reuses the existing ASR provider; maps no-speech etc. to 422, hides 5xx). +6 tests; server suite green.
+- **Workflow:** built on `feat/ios-keyboard-app`, opened **PR #1**, merged to `main`.
+- **Caveat:** the iOS code is correct-by-inspection — Xcode/device builds can't run in this env. Fixed real issues during authoring (iOS 17 deployment target for `AVAudioApplication`/two-param `onChange`; audio-tap concurrency; keychain access-group placeholder only resolves in entitlements, so `TokenStore` omits the explicit group).
+- **Next (iOS):** real Auth0 sign-in (`ASWebAuthenticationSession` + token refresh); then live streaming / interim results. Keep landing desktop+server fixes alongside.
 
 ### Iteration 12 — 2026-06-10
 - **Fix (P0 renderer):** `app.tsx` wrote `settings.isShortcutGloballyEnabled` via `window.api.send` **during render** (in both return branches), so it fired on every render — and twice under React 18 Strict Mode — spamming the main process and racing the store write. Moved into a `useEffect` keyed on the value (sends only when it changes; both branches sent the same value, so behavior is preserved).
