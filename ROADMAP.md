@@ -95,6 +95,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 25 — 2026-06-11
+- **Fix (renderer UX):** the microphone picker showed an empty scroll area while enumerating devices (or when none were found / permission denied), with no feedback. Added a "Loading microphones…" state and a "No microphones found" empty state (with a connection/permission hint). Web type-check clean for the file.
+- **(Verified non-bug:** the audit's "status-indicator success/error wording" flag — `NotesContent` sets `statusMessage` to the matching success/error text alongside `setStatusIndicator` in every path, so the single message always matches the icon; `DictionaryContent` already uses separate messages. Left as-is.)
+- **Next:** thinning testable backlog — remaining items are mostly product decisions (streaming ASR provider, snippets, hands-free) or untestable native/iOS. Awaiting user direction.
+
 ### Iteration 24 — 2026-06-11
 - **Fix (renderer UX/perf):** `NotesContent`'s load effect listed `notes.length` + `addNote` as deps, so it re-ran `loadNotes()` (a full DB re-fetch over IPC) on every add/delete — a redundant round-trip + list flash (and thrash risk), since the store already refreshes after a successful add. Now loads once on mount (`loadNotes` is a stable store action). Web type-check clean for the file.
 - **Next:** remaining renderer UX cleanups (status-indicator success/error wording, mic-selector loading/empty states) and product-decision items (streaming ASR provider, snippets, hands-free) awaiting user input.
