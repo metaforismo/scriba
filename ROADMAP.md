@@ -95,6 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 24 — 2026-06-11
+- **Fix (renderer UX/perf):** `NotesContent`'s load effect listed `notes.length` + `addNote` as deps, so it re-ran `loadNotes()` (a full DB re-fetch over IPC) on every add/delete — a redundant round-trip + list flash (and thrash risk), since the store already refreshes after a successful add. Now loads once on mount (`loadNotes` is a stable store action). Web type-check clean for the file.
+- **Next:** remaining renderer UX cleanups (status-indicator success/error wording, mic-selector loading/empty states) and product-decision items (streaming ASR provider, snippets, hands-free) awaiting user input.
+
 ### Iteration 23 — 2026-06-11
 - **Fix (data integrity, sync):** the `lastSyncedAt` watermark was advanced to `new Date()` **after** the multi-second push/pull, so any row edited *during* the sync window had `updated_at` < the new watermark and was silently skipped next cycle (until touched again) — lost edits. Now the watermark is captured at **sync start**; re-checking those rows next cycle is idempotent (upserts are keyed on row id). +1 deterministic test (a slow pull proves the watermark predates it). Full lib suite green.
 - **Next:** mostly product-decision items remain (streaming ASR provider for live mode; snippets; hands-free) — surfaced to the user. Continue small testable fixes meanwhile.
