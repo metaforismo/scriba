@@ -62,6 +62,11 @@ export class ServerTimingCollector {
   private readonly FLUSH_INTERVAL_MS = 2_000 // 2 seconds
   private readonly BATCH_SIZE = 5 // Smaller batches
   private readonly MAX_QUEUE_SIZE = 50
+  // Cap concurrent in-flight timings. activeTimings is keyed by a client-supplied
+  // interaction id and is normally cleared on finalize/clear, but an aborted
+  // stream (or a client spamming distinct ids) could otherwise grow it without
+  // bound. 100 is far above realistic concurrency per server instance.
+  private readonly MAX_ACTIVE_TIMINGS = 100
 
   constructor() {
     this.scheduleFlush()
@@ -77,6 +82,22 @@ export class ServerTimingCollector {
         '[ServerTimingCollector] Cannot start timing: no interaction ID provided',
       )
       return
+    }
+
+    // Bound the map: if at capacity, evict the oldest in-flight timing (Map
+    // preserves insertion order), which is the most likely to be an abandoned /
+    // aborted stream that never got cleared.
+    if (
+      this.activeTimings.size >= this.MAX_ACTIVE_TIMINGS &&
+      !this.activeTimings.has(interactionId)
+    ) {
+      const oldest = this.activeTimings.keys().next().value
+      if (oldest !== undefined) {
+        this.activeTimings.delete(oldest)
+        console.warn(
+          `[ServerTimingCollector] activeTimings at capacity, evicting oldest: ${oldest}`,
+        )
+      }
     }
 
     this.activeTimings.set(interactionId, {

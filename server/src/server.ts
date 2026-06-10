@@ -30,7 +30,14 @@ export const startServer = async () => {
     trustProxy: true,
   })
 
-  await connectRpcServer.register(cors, { origin: '*' })
+  // CORS: lock down to known origins in production by setting CORS_ORIGIN
+  // (comma-separated). Defaults to '*' for local/dev so nothing breaks out of the
+  // box. The desktop client calls from the Electron main process (not browser-
+  // CORS-bound), so this mainly hardens any browser-facing routes.
+  const corsOrigin = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+    : '*'
+  await connectRpcServer.register(cors, { origin: corsOrigin })
 
   // Register the Auth0 plugin
   const REQUIRE_AUTH = process.env.REQUIRE_AUTH === 'true'
@@ -184,12 +191,17 @@ export const startServer = async () => {
     await registerBillingRoutes(fastify, { requireAuth: REQUIRE_AUTH })
   })
 
-  // Error handling - this handles Fastify-level errors, not RPC errors
+  // Error handling - this handles Fastify-level errors, not RPC errors.
+  // Always log the full error server-side. Surface 4xx messages (client errors
+  // are meant to be actionable), but never leak 5xx internals to the client.
   connectRpcServer.setErrorHandler((error, _, reply) => {
     connectRpcServer.log.error(error)
-    reply.status(500).send({
-      error: 'Internal Server Error',
-      message: error.message,
+    const statusCode = error.statusCode ?? 500
+    reply.status(statusCode).send({
+      error:
+        statusCode >= 500
+          ? 'Internal Server Error'
+          : error.message || 'Request Error',
     })
   })
 
