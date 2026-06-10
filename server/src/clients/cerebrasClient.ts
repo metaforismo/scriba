@@ -75,7 +75,9 @@ class CerebrasClient implements LlmProvider {
         temperature,
       })
 
-      return (completion.choices as any)[0]?.message?.content?.trim() || ' '
+      // Empty output -> empty string (not a lone space); the caller skips
+      // insertion for an empty transcript instead of failing the text inserter.
+      return (completion.choices as any)[0]?.message?.content?.trim() || ''
     } catch (error: any) {
       console.error('An error occurred during transcript adjustment:', error)
       if (error instanceof ClientError) {

@@ -80,8 +80,10 @@ class GroqClient implements LlmProvider {
         temperature,
       })
 
-      // Return a space to enable emptying the document
-      return completion.choices[0]?.message?.content?.trim() || ' '
+      // Empty output -> return empty string (not a lone space). The caller skips
+      // insertion for an empty transcript; a space would fail the text inserter
+      // and surface a confusing "insert failed" instead.
+      return completion.choices[0]?.message?.content?.trim() || ''
     } catch (error: any) {
       console.error('An error occurred during transcript adjustment:', error)
       if (error instanceof ClientError) {

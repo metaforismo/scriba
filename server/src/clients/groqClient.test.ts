@@ -344,7 +344,7 @@ describe('GroqClient', () => {
       ).rejects.toThrow('LLM API error')
     })
 
-    it('should handle empty LLM response', async () => {
+    it('returns an empty string (not a space) on empty LLM output', async () => {
       const mockCompletion = {
         choices: [
           {
@@ -364,7 +364,9 @@ describe('GroqClient', () => {
           'You are a dictation assistant named Scriba. Your job is to fulfill the intent of the transcript without asking follow up questions.',
       })
 
-      expect(result).toBe(' ')
+      // Empty (not ' ') so the caller skips insertion rather than failing the
+      // text inserter with a whitespace-only string.
+      expect(result).toBe('')
     })
   })
 })
