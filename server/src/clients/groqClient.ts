@@ -144,13 +144,24 @@ class GroqClient implements LlmProvider {
 
       const segments = (transcription as any).segments
       if (segments && segments.length > 0) {
-        const first = segments[0]
-        if (first?.no_speech_prob > noSpeechThreshold) {
-          console.log('No speech probability:', first.no_speech_prob)
-          throw new ClientNoSpeechError(
-            ClientProvider.GROQ,
-            first.no_speech_prob,
+        // Flag "no speech" only when EVERY segment is above the threshold — i.e.
+        // there is no speech anywhere in the recording. Inspecting only
+        // segments[0] (the previous behavior) wrongly rejected a dictation that
+        // merely started with a breath/noise (losing valid speech), and handled
+        // trailing silence after real speech inconsistently.
+        const probs: number[] = segments.map(
+          (s: any) => s?.no_speech_prob ?? 0,
+        )
+        const allNoSpeech = probs.every(p => p > noSpeechThreshold)
+        if (allNoSpeech) {
+          // Report the most speech-like segment's prob (the strongest signal
+          // that still failed the threshold).
+          const minProb = Math.min(...probs)
+          console.log(
+            'No speech detected across all segments. Lowest no_speech_prob:',
+            minProb,
           )
+          throw new ClientNoSpeechError(ClientProvider.GROQ, minProb)
         }
       }
 

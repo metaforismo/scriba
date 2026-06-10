@@ -227,6 +227,48 @@ describe('GroqClient', () => {
       ).rejects.toThrow('No speech detected')
     })
 
+    it('should throw only when EVERY segment is above the no-speech threshold', async () => {
+      mockGroqClient.audio.transcriptions.create.mockResolvedValue({
+        text: '',
+        segments: [
+          { no_speech_prob: NO_SPEECH_THRESHOLD + 0.05 },
+          { no_speech_prob: NO_SPEECH_THRESHOLD + 0.2 },
+        ],
+      })
+
+      await expect(
+        groqClient.transcribeAudio(Buffer.from('silence'), {
+          fileType: 'wav',
+          asrModel: 'whisper-large-v3',
+          noSpeechThreshold: NO_SPEECH_THRESHOLD,
+        }),
+      ).rejects.toThrow('No speech detected')
+    })
+
+    it('should NOT reject a dictation that starts with noise but contains speech', async () => {
+      // First segment looks like non-speech (a breath/noise), but a later
+      // segment is clearly speech — the recording must be kept, not rejected.
+      mockGroqClient.audio.transcriptions.create.mockResolvedValue({
+        text: 'Hello, this is a real sentence',
+        segments: [
+          { no_speech_prob: NO_SPEECH_THRESHOLD + 0.1 },
+          { no_speech_prob: 0.01 },
+          { no_speech_prob: 0.02 },
+        ],
+      })
+
+      const result = await groqClient.transcribeAudio(
+        Buffer.from('noise then speech'),
+        {
+          fileType: 'wav',
+          asrModel: 'whisper-large-v3',
+          noSpeechThreshold: NO_SPEECH_THRESHOLD,
+        },
+      )
+
+      expect(result).toBe('Hello, this is a real sentence')
+    })
+
     it('should handle Groq API errors properly', async () => {
       const mockError = new Error('Groq API error')
       mockGroqClient.audio.transcriptions.create.mockRejectedValue(mockError)
