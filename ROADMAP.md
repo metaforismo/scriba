@@ -69,7 +69,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ### P3 — Mobile (new platforms)
 - [x] **Stack decided: native iOS (Swift)** — user chose native iOS. Started in `ios/` (XcodeGen: container app + keyboard extension + shared layer). *(PR #1, iter 13)*
-- [~] **iOS**: keyboard extension w/ Full Access + mic + live waveform + record→`/v1/transcribe`→insert (PR #1), **real Auth0 sign-in** (PKCE via `ASWebAuthenticationSession`, shared-Keychain tokens, refresh-on-launch — PR #2), and cleanup-level parity (iter 14). Remaining: keyboard-side 401 refresh, live streaming/interim results, auto-fallback for number/phone/email fields, app icon/assets, on-device testing. Don't break repeat-dictation/external keyboards (their App Store complaint).
+- [~] **iOS**: keyboard extension w/ Full Access + mic + live waveform + record→`/v1/transcribe`→insert (PR #1), **real Auth0 sign-in** (PKCE via `ASWebAuthenticationSession`, shared-Keychain tokens — PR #2), cleanup-level parity (iter 14), **self-healing 401 refresh** in the keyboard (PR #3). Remaining: live streaming/interim results, auto-fallback for number/phone/email fields, app icon/assets, on-device testing. Don't break repeat-dictation/external keyboards (their App Store complaint).
 - [ ] **Android**: floating-bubble overlay (don't replace Gboard); Accessibility direct-insert + clipboard fallback; tap-toggle + press-hold; OEM background-kill onboarding.
 - [ ] **Free unlimited mobile tier** as a land-grab (Wispr did this on Android).
 - [ ] Reuse server: the gRPC `ScribaService.TranscribeStreamV2` + auth already exist; mobile clients can target the same backend.
@@ -94,6 +94,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 16 — 2026-06-10 (iOS self-healing auth) — PR #3
+- **Feat (iOS):** the keyboard now **refreshes an expired token and retries** instead of surfacing "please sign in" and forcing the user back into the app. Moved the non-interactive refresh into the **Shared** layer (`Auth0Config` → Shared; new `TokenRefresher` + `Auth0TokenEndpoint`) so the extension can use it; added the `AUTH0_*` keys to the keyboard's Info.plist. `TranscriptionClient` retries once on a 401 after a refresh (`allowRefresh` guards loops); `AuthService` now delegates refresh + token POST to the shared code (removing duplication).
+- **Workflow:** `feat/ios-keyboard-refresh` → **PR #3** → merged. iOS-only, correct-by-inspection.
+- **Next:** live streaming / interim transcripts (the Wispr "live" feel), or secure/number-field fallback; keep landing desktop+server fixes too.
 
 ### Iteration 15 — 2026-06-10 (iOS Auth0 sign-in) — PR #2
 - **Feat (iOS):** real **Auth0 sign-in**, mirroring the desktop PKCE flow. `AuthService` runs authorization-code + PKCE via `ASWebAuthenticationSession` (Auth0 `/authorize` → `scriba://callback` → `/oauth/token`, scope `openid profile email offline_access`) and refreshes the access token from the stored refresh token. `Auth0Config` reads `AUTH0_*` from Info.plist (empty ⇒ dev-token fallback). `Credentials` (access+refresh+expiry) live in the shared Keychain; the container app refreshes on launch so the keyboard's token stays valid. Registered the `scriba://` URL scheme.
