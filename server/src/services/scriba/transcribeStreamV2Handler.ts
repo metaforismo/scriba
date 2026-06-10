@@ -29,9 +29,14 @@ import {
   ServerTimingEventName,
 } from '../timing/ServerTimingCollector.js'
 import { kUser } from '../../auth/userContext.js'
+import { HeaderValidator } from '../../validation/HeaderValidator.js'
 
 export class TranscribeStreamV2Handler {
   private readonly MODE_CHANGE_GRACE_PERIOD_MS = 100
+  // Backstop against a client streaming unbounded audio (the proto caps each
+  // chunk at 1 MB but not the count). 100 MB ≈ ~50 min at 16 kHz/16-bit mono —
+  // far beyond any real dictation, so this only trips on abuse/runaway.
+  private readonly MAX_TOTAL_AUDIO_BYTES = 100 * 1024 * 1024
 
   async process(
     requests: AsyncIterable<TranscribeStreamRequest>,
@@ -190,6 +195,7 @@ export class TranscribeStreamV2Handler {
     previousMode: ScribaMode | undefined
   }> {
     const audioChunks: Uint8Array[] = []
+    let totalAudioBytes = 0
     let mergedConfig: StreamConfig = create(StreamConfigSchema, {
       context: undefined,
       llmSettings: undefined,
@@ -201,6 +207,13 @@ export class TranscribeStreamV2Handler {
     try {
       for await (const request of requests) {
         if (request.payload.case === 'audioData') {
+          totalAudioBytes += request.payload.value.length
+          if (totalAudioBytes > this.MAX_TOTAL_AUDIO_BYTES) {
+            throw new ConnectError(
+              `Audio stream exceeded the maximum size of ${this.MAX_TOTAL_AUDIO_BYTES} bytes`,
+              Code.ResourceExhausted,
+            )
+          }
           audioChunks.push(request.payload.value)
         } else if (request.payload.case === 'config') {
           const currentMode = mergedConfig.context?.mode
@@ -284,7 +297,10 @@ export class TranscribeStreamV2Handler {
         mergedConfig.llmSettings?.noSpeechThreshold,
         DEFAULT_ADVANCED_SETTINGS.noSpeechThreshold,
       ),
-      vocabulary: mergedConfig.vocabulary,
+      // Validate/sanitize before it reaches the Whisper prompt. The V1 path
+      // already ran headers through HeaderValidator.validateVocabulary; V2 fed
+      // the raw repeated field straight into the prompt (injection / abuse risk).
+      vocabulary: HeaderValidator.validateVocabularyArray(mergedConfig.vocabulary),
     }
   }
 

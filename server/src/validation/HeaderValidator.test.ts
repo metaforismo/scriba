@@ -114,6 +114,49 @@ describe('HeaderValidator', () => {
     })
   })
 
+  describe('validateVocabularyArray (V2 repeated field)', () => {
+    it('should return trimmed valid words from an array', () => {
+      const result = HeaderValidator.validateVocabularyArray([
+        '  hello ',
+        'world',
+        '',
+        '   ',
+      ])
+      expect(result).toEqual(['hello', 'world'])
+    })
+
+    it('should never throw on null/undefined and return []', () => {
+      expect(HeaderValidator.validateVocabularyArray(null as any)).toEqual([])
+      expect(HeaderValidator.validateVocabularyArray(undefined as any)).toEqual(
+        [],
+      )
+    })
+
+    it('should filter out words with invalid characters instead of rejecting all', () => {
+      const result = HeaderValidator.validateVocabularyArray([
+        'valid',
+        '<script>',
+        'another',
+        'bad&word',
+      ])
+      expect(result).toEqual(['valid', 'another'])
+    })
+
+    it('should filter out words that are too long', () => {
+      const result = HeaderValidator.validateVocabularyArray([
+        'valid',
+        'a'.repeat(101),
+        'another',
+      ])
+      expect(result).toEqual(['valid', 'another'])
+    })
+
+    it('should cap the list at 500 words', () => {
+      const words = Array.from({ length: 600 }, (_, i) => `word${i}`)
+      expect(HeaderValidator.validateVocabularyArray(words)).toHaveLength(500)
+    })
+  })
+
   describe('validateAsrProvider', () => {
     it('should return valid ASR provider names', () => {
       expect(HeaderValidator.validateAsrProvider('groq')).toBe('groq')

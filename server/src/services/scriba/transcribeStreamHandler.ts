@@ -10,7 +10,7 @@
  */
 
 import { create } from '@bufbuild/protobuf'
-import { ConnectError } from '@connectrpc/connect'
+import { ConnectError, Code } from '@connectrpc/connect'
 import type { HandlerContext } from '@connectrpc/connect'
 import {
   AudioChunk,
@@ -37,9 +37,16 @@ import { HeaderValidator } from '../../validation/HeaderValidator.js'
  * @deprecated Maintained for backwards compatibility only.
  */
 export class TranscribeStreamHandler {
+  // Backstop against unbounded audio (matches the V2 handler). 100 MB is far
+  // beyond any real dictation, so this only trips on abuse/runaway streams.
+  private readonly MAX_TOTAL_AUDIO_BYTES = 100 * 1024 * 1024
+  // Cap on decoded context text fed into the LLM prompt, to bound prompt size.
+  private readonly MAX_CONTEXT_TEXT_LENGTH = 20000
+
   async process(requests: AsyncIterable<AudioChunk>, context: HandlerContext) {
     const startTime = Date.now()
     const audioChunks: Uint8Array[] = []
+    let totalAudioBytes = 0
 
     console.log(
       `📩 [${new Date().toISOString()}] Starting transcription stream (V1 - DEPRECATED)`,
@@ -47,6 +54,13 @@ export class TranscribeStreamHandler {
 
     // Process each audio chunk from the stream
     for await (const chunk of requests) {
+      totalAudioBytes += chunk.audioData.length
+      if (totalAudioBytes > this.MAX_TOTAL_AUDIO_BYTES) {
+        throw new ConnectError(
+          `Audio stream exceeded the maximum size of ${this.MAX_TOTAL_AUDIO_BYTES} bytes`,
+          Code.ResourceExhausted,
+        )
+      }
       audioChunks.push(chunk.audioData)
     }
 
@@ -113,11 +127,28 @@ export class TranscribeStreamHandler {
       const appName = context.requestHeader.get('app-name') || ''
       const mode = getScribaMode(context.requestHeader.get('mode'))
 
-      // Decode context text if it was base64 encoded due to Unicode characters
+      // Decode context text if it was base64 encoded due to Unicode characters.
+      // Guard the decode and bound the length so a malformed/oversized header
+      // can't crash the handler or balloon the LLM prompt.
       const rawContextText = context.requestHeader.get('context-text') || ''
-      const contextText = rawContextText.startsWith('base64:')
-        ? Buffer.from(rawContextText.substring(7), 'base64').toString('utf8')
-        : rawContextText
+      let contextText = rawContextText
+      if (rawContextText.startsWith('base64:')) {
+        try {
+          contextText = Buffer.from(
+            rawContextText.substring(7),
+            'base64',
+          ).toString('utf8')
+        } catch (decodeError) {
+          console.error(
+            'Failed to decode base64 context-text header, ignoring it:',
+            decodeError,
+          )
+          contextText = ''
+        }
+      }
+      if (contextText.length > this.MAX_CONTEXT_TEXT_LENGTH) {
+        contextText = contextText.slice(0, this.MAX_CONTEXT_TEXT_LENGTH)
+      }
 
       const windowContext: ScribaContext = { windowTitle, appName, contextText }
 

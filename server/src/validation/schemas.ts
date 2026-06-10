@@ -81,6 +81,27 @@ export const VocabularySchema = z
       })
   })
 
+// Vocabulary provided as a repeated field (the V2 stream's StreamConfig.vocabulary
+// arrives as a string[]). Mirrors VocabularySchema's per-word validation and caps,
+// but for array input, and filters bad words instead of rejecting the whole stream.
+export const VocabularyArraySchema = z
+  .array(z.string())
+  .catch([]) // a non-array (shouldn't happen via protobuf) degrades to empty
+  .transform(words =>
+    words
+      .slice(0, 500) // cap the count before any per-word work
+      .map(word => word.trim())
+      .filter(word => word.length > 0)
+      .filter(word => {
+        try {
+          VocabularyWordSchema.parse(word)
+          return true
+        } catch {
+          return false
+        }
+      }),
+  )
+
 // Header validation schema
 export const HeaderSchema = z.object({
   asrModel: AsrModelSchema.optional(),

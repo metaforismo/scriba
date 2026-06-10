@@ -9,6 +9,7 @@ import {
   LLMTemperatureSchema,
   NoSpeechThresholdSchema,
   VocabularySchema,
+  VocabularyArraySchema,
 } from './schemas.js'
 
 /**
@@ -127,5 +128,15 @@ export class HeaderValidator {
         Code.InvalidArgument,
       )
     }
+  }
+
+  /**
+   * Validates the V2 stream's repeated `vocabulary` field. Unlike the header
+   * variants this never throws: it filters out invalid/oversized words and caps
+   * the count, so one bad word can't fail an otherwise-valid dictation. The V2
+   * path previously fed this straight into the Whisper prompt unvalidated.
+   */
+  static validateVocabularyArray(words: string[]): string[] {
+    return VocabularyArraySchema.parse(words ?? [])
   }
 }
