@@ -169,7 +169,8 @@ export class InteractionsTable {
         duration_ms = excluded.duration_ms,
         sample_rate = excluded.sample_rate,
         updated_at = excluded.updated_at,
-        deleted_at = excluded.deleted_at;
+        deleted_at = excluded.deleted_at
+      WHERE excluded.updated_at > interactions.updated_at;
     `
     const params = [
       interaction.id,
@@ -284,7 +285,8 @@ export class NotesTable {
         interaction_id = excluded.interaction_id,
         content = excluded.content,
         updated_at = excluded.updated_at,
-        deleted_at = excluded.deleted_at;
+        deleted_at = excluded.deleted_at
+      WHERE excluded.updated_at > notes.updated_at;
     `
     const params = [
       note.id,
@@ -397,7 +399,8 @@ export class DictionaryTable {
         word = excluded.word,
         pronunciation = excluded.pronunciation,
         updated_at = excluded.updated_at,
-        deleted_at = excluded.deleted_at;
+        deleted_at = excluded.deleted_at
+      WHERE excluded.updated_at > dictionary_items.updated_at;
     `
     const params = [
       item.id,
