@@ -95,6 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 18 — 2026-06-10 (back to testable: Whisper prompt)
+- **Fix (P4, server):** the Whisper transcription-prompt builder char-sliced the vocabulary then regex-stripped a partial last term — which could over-truncate (drop a complete term) or leave a fragment for a single over-long term; and `chars/4` badly underestimates non-ASCII (CJK/accented) text, so a vocab that "fit" by that estimate could silently overflow the 224-token cap and degrade transcription. Now truncates by **whole terms** (keeps as many complete terms as fit, never mid-term) and `estimateTokenCount` counts non-ASCII chars near 1 token each (conservative). +2 tests; existing behavior preserved; server suite green (13 files).
+- **Next:** iOS live streaming (big), or more testable desktop/server fixes (e.g. revisit the EDIT `' '` empty-output sentinel, mode-detection commands).
+
 ### Iteration 17 — 2026-06-10 (iOS field fallback) — PR #4
 - **Feat (iOS, Wispr parity):** the keyboard now falls back to the system keyboard for **numeric/secure** fields (dictation is useless for phone numbers/passwords). New `KeyboardContext`/`FieldMode` derived from the host field's traits (`textDocumentProxy.keyboardType` + `isSecureTextEntry`), recomputed on `viewWillAppear`/`textDidChange`; for those fields `KeyboardView` hides the mic and shows a "Switch keyboard" (globe) prompt.
 - **Workflow:** `feat/ios-field-fallback` → **PR #4** → merged. iOS-only, correct-by-inspection.
