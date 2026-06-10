@@ -95,6 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 14 — 2026-06-10
+- **Feat (mobile parity):** the iOS keyboard already sent a `transcript-cleanup-level` header, but the new `/v1/transcribe` endpoint ignored it (always verbatim). Extracted the verbatim/light/heavy cleanup pass out of the V2 streaming handler into a shared `cleanupTranscript()` and used it in **both** the streaming handler and the mobile endpoint — so mobile gets the same polish as desktop, with no logic duplication. Still best-effort (verbatim/empty/LLM-error → raw transcript). +6 tests (5 for the shared fn, 1 endpoint header path). Server suite green (13 files).
+- **Next (iOS):** real Auth0 sign-in (`ASWebAuthenticationSession` + token refresh), then live streaming / interim results.
+
 ### Iteration 13 — 2026-06-10 (mobile track started — native iOS) — PR #1
 - **Decision:** user chose **native iOS (Swift)**. Mobile stack is no longer blocked.
 - **Feat (P3):** scaffolded a Wispr-Flow-style **iOS dictation keyboard** under `ios/` (XcodeGen-managed; `project.yml`). Container app (SwiftUI onboarding to enable the keyboard + mic permission + settings) and a **keyboard extension** (`UIInputViewController` hosting a SwiftUI keyboard — mic button, live waveform, globe/space/delete/return; `AVAudioEngine` → 16 kHz mono WAV; record→transcribe→insert state machine; `RequestsOpenAccess` for mic+network). Shared layer: configurable backend URL (not hardcoded to prod), shared-Keychain token store (app ⇄ keyboard), cleanup level, transcription client.
