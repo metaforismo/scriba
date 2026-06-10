@@ -49,8 +49,9 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 - [x] **Concurrency guard on `startSession`** → re-entrancy flag held during the async setup window (released in `finally`, so a lost key-up can't lock out future sessions) + rollback of the created interaction when `initialize()` returns false. Prevents the hotkey + manual-pill double-start desync. *(iter 3)*
 - [x] **`completeSession`/`cancelSession` race on `streamResponsePromise`** → whoever captures the (non-null) promise owns teardown; the second stop now no-ops instead of cancelling the in-flight transcription / double-stopping audio. Prevents dropped transcripts when a cancel lands right after a complete. *(iter 4)*
 - [x] **gRPC empty auth header instead of failing** → `getHeaders()` now throws a recognizable `ConnectError(Unauthenticated)` when the token is null (instead of sending an authless request), so `withRetry`/`handleAuthError` run the same refresh-then-retry-or-sign-out path *locally* — no wasted 401 round-trip, no per-call refresh/logout loop while signed out, and it surfaces as "Please sign in". *(iter 5)*
-- [ ] **Retry/queue on network failure** — a failed dictation is currently lost forever. Add 1 retry + clipboard fallback (copy Wispr's graceful-degradation pattern).
-- [ ] **Key-listener restart orphans in-flight session** (recording continues, no key-up). Reconcile `pressedKeys`/`activeShortcutId` on restart. (`keyboard.ts:88-95`)
+- [~] **Retry/queue on network failure** — a failed dictation is currently lost forever. *Insert-failure clipboard fallback done (iter 6): when paste fails, the transcript is copied to the clipboard + a visible error.* Still TODO: retry/queue for the network/stream-error path (audio buffer is still dropped on a thrown stream error).
+- [x] **Key-listener restart orphans in-flight session** → `stopKeyListener` now cancels an active session when the listener goes away (heartbeat-timeout restart / quit), since the key-up that would stop it will never arrive. Also: clear pressed-key state when shortcuts are disabled mid-recording, and de-dupe OS key-repeat keydowns. *(iter 6)*
+- [x] **Start/stop tearing race** → a fast key-up could run `completeSession` while `startSession` was still mid-await (before `streamResponsePromise` was assigned), capturing null and orphaning the recording (stuck on). `complete`/`cancelSession` now await the in-flight start before taking ownership. *(iter 6)*
 
 ### P1 — Core quality (the cleanup-layer moat + latency)
 - [ ] **AI auto-formatting on by default** in TRANSCRIBE mode: filler removal, smart punctuation, paragraph/list detection. Currently only capitalize-first + leading-space, and `grammarServiceEnabled` defaults **false** (`store.ts:149`). This is Wispr's signature feature.
@@ -93,6 +94,25 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 6 — 2026-06-10 (UI/UX + edge-case + bug sweep)
+Ran a 3-layer audit (renderer / main-process / server) and fixed the top correctness issues across all of them. **The whole test suite (lib + server + app) is green** — and `node_modules` is now installed, so tests actually run in this env (`bun test --preload lib/__tests__/setup.ts <file>` for lib; plain `bun test` for server).
+
+- **Desktop pipeline (`scribaSessionManager`, `keyboard`):**
+  - Text insertion is now awaited; on failure the transcript is copied to the clipboard with a visible error, instead of being silently dropped.
+  - Server error code is persisted with the interaction (was dropped).
+  - `complete`/`cancelSession` wait for an in-flight `startSession` → no more start/stop tearing (orphaned recording stuck on).
+  - Listener stop/restart cancels an orphaned session; shortcuts-disabled-mid-recording clears pressed-key state; OS key-repeat keydowns are de-duped.
+  - +6 unit tests.
+- **Server (`transcribeStreamV2Handler`, `transcribeStreamHandler`, validation):**
+  - V2 `vocabulary` (repeated field) is now validated/sanitized before hitting the Whisper prompt (it was raw — injection/abuse risk; V1 already validated). New `VocabularyArraySchema` + `validateVocabularyArray` (filters bad words, caps 500, never throws).
+  - Both handlers cap cumulative audio at 100 MB (`ResourceExhausted`) — the proto caps per-chunk at 1 MB but not the count (memory-exhaustion DoS).
+  - V1 base64 `context-text` decode is guarded + length-capped.
+  - +5 unit tests.
+- **Renderer (`Pill.tsx`):** the pill's IPC subscription effect listed `volumeHistory`/`lastVolumeUpdate`/`recordingMode` in deps, so it tore down + re-registered all 7 listeners on every audio frame (~16×/s), dropping volume events. Now mount-only via a ref + functional updaters.
+- **Rename:** code rename ito→scriba is already complete (appId `ai.scriba.scriba`, package `scriba`, zero user-visible "Ito" strings). The only remaining `ito` is the external `heyito` org/domain (`github.com/heyito/scriba`, `heyito.ai`, `link.heyito.ai`, the `heyito/rdev` Cargo dep, `dev-app-update.yml` owner) — these point to real infra and need the user's real new org/domain before changing (flagged, not guessed).
+- **Audit backlog (not yet done, highest-value next):** network-failure retry/queue (audio dropped on stream-error); ASR provider failover (P1); AI auto-formatting default + verbatim toggle (P1, the Wispr moat); streaming/interim transcripts (P1); plus a sizable list of P1/P2 UI findings (settings validation/save-feedback, onboarding permission dead-ends, native alert()/confirm() in renderer, mic-selector loading/empty states, pill ARIA/keyboard a11y).
+- **Next:** P1 — AI auto-formatting on by default + verbatim/light/heavy toggle (Wispr's signature cleanup layer), or the network retry/queue, depending on user priority.
 
 ### Iteration 5 — 2026-06-10
 - **Fix (P0):** `grpcClient.getHeaders()` no longer returns an empty `Headers` object when the auth token is null — it now throws `ConnectError('Not authenticated', Code.Unauthenticated)`. The comment had claimed it threw "to pinpoint auth issues", but it actually sent an **authless request**: a guaranteed server 401, and — because every RPC runs inside `withRetry` — a refresh/logout cycle on *every* call while signed out, plus (for the streaming RPC) a partially-consumed stream that couldn't be safely retried. Throwing locally before any network/stream work means `handleAuthError` runs the **same** recovery (refresh → retry, or sign-out via `auth-token-expired`) without the wasted round-trip, and the thrown `Unauthenticated` maps to "Please sign in" in the pill (iter 2's `friendlyExceptionError`). Rewrote the "no auth token" test into two: (1) no token → refresh succeeds → operation retried once and the server method fires exactly once; (2) no token + refresh fails → call rejects, server method **never** called, user signed out.
