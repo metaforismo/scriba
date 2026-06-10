@@ -95,6 +95,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 12 — 2026-06-10
+- **Fix (P0 renderer):** `app.tsx` wrote `settings.isShortcutGloballyEnabled` via `window.api.send` **during render** (in both return branches), so it fired on every render — and twice under React 18 Strict Mode — spamming the main process and racing the store write. Moved into a `useEffect` keyed on the value (sends only when it changes; both branches sent the same value, so behavior is preserved).
+- **Fix (P1):** the Advanced-Settings debounced save had no error handling (a failed `updateAdvancedSettings` became an unhandled promise rejection) → wrapped in try/catch. Also fixed `getDisplayValue` to coalesce the now-optional `transcriptCleanupLevel` (undefined → null), resolving a latent web type error from iter 9.
+- **Deferred (still):** mobile track (blocked on the native-vs-Expo stack decision — and unbuildable/untestable in this env); ASR `low_quality_threshold` (avg_logprob rejection risks dropping valid dictations — won't enable without real-audio tuning); AdvancedSettings flush-on-unmount + save-status UI; the `alert()/confirm()` → Dialog replacements; PermissionsContent denied-state dead-end.
+- **Next:** continue safe renderer/UX bug fixes (permission denied-state recovery, alert/confirm replacement), or take the mobile stack decision to the user.
+
 ### Iteration 11 — 2026-06-10 (backlog sweep, waves A–E)
 Worked through the remaining iter-6 audit + "Next" items in five tested, committed, pushed waves:
 - **A — quick wins:** `voiceInputService` now unmutes based on whether *this* session muted (new `didMuteSystemAudio` flag), so toggling `muteAudioWhenDictating` mid-dictation can't leave audio permanently muted (+3 tests); removed the erroneous `import { main } from 'bun'` (+ a dead `DEFAULT_ADVANCED_SETTINGS` import) from `syncService`; `groqClient` runs availability/model guards before `toFile()` and moved `toFile()` inside the try so its failures are wrapped as `ClientApiError`.
