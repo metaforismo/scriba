@@ -255,4 +255,66 @@ describe('ScribaStreamController', () => {
     expect(duration).toBe(5000)
     expect(mockAudioStreamManager.getAudioDurationMs).toHaveBeenCalled()
   })
+
+  test('retranscribe replays the buffered audio through a fresh stream', async () => {
+    const { ScribaStreamController } = await import('./scribaStreamController')
+    const controller = new ScribaStreamController()
+
+    await controller.initialize(ScribaMode.TRANSCRIBE)
+    mockAudioStreamManager.getInteractionAudioBuffer.mockReturnValue(
+      Buffer.from('retained-audio'),
+    )
+    mockGrpcClient.transcribeStreamV2.mockResolvedValueOnce({
+      transcript: 'recovered',
+    })
+
+    const result = await controller.retranscribe()
+
+    expect(mockGrpcClient.transcribeStreamV2).toHaveBeenCalledTimes(1)
+    expect(result.response).toEqual({ transcript: 'recovered' })
+    expect(result.audioBuffer).toEqual(Buffer.from('retained-audio'))
+    expect(result.sampleRate).toBe(16000)
+  })
+
+  test('retranscribe streams a mode config followed by the buffered audio chunks', async () => {
+    const { ScribaStreamController } = await import('./scribaStreamController')
+    const controller = new ScribaStreamController()
+
+    await controller.initialize(ScribaMode.EDIT)
+    // 70 KB with 32 KB chunks => 3 audio messages.
+    mockAudioStreamManager.getInteractionAudioBuffer.mockReturnValue(
+      Buffer.alloc(70 * 1024, 1),
+    )
+    mockGrpcClient.transcribeStreamV2.mockResolvedValueOnce({ transcript: 'ok' })
+
+    await controller.retranscribe()
+
+    // The mock doesn't consume the generator, so we can drain it here to assert
+    // the replayed message shape.
+    const generator = mockGrpcClient.transcribeStreamV2.mock.calls[0][0]
+    const messages: any[] = []
+    for await (const message of generator) {
+      messages.push(message)
+    }
+
+    expect(messages[0].payload.case).toBe('config')
+    expect(messages[0].payload.value.context.mode).toBe(ScribaMode.EDIT)
+    const audioMessages = messages.filter(m => m.payload.case === 'audioData')
+    expect(audioMessages).toHaveLength(3)
+  })
+
+  test('retranscribe throws when there is no buffered audio', async () => {
+    const { ScribaStreamController } = await import('./scribaStreamController')
+    const controller = new ScribaStreamController()
+
+    await controller.initialize(ScribaMode.TRANSCRIBE)
+    mockAudioStreamManager.getInteractionAudioBuffer.mockReturnValue(
+      Buffer.alloc(0),
+    )
+
+    await expect(controller.retranscribe()).rejects.toThrow(
+      'No buffered audio',
+    )
+    expect(mockGrpcClient.transcribeStreamV2).not.toHaveBeenCalled()
+  })
 })

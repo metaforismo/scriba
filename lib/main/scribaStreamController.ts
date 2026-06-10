@@ -85,6 +85,72 @@ export class ScribaStreamController {
     }
   }
 
+  /**
+   * Re-transcribes the audio buffered from the just-finished interaction. Used as
+   * a single retry after a transient network/stream failure, so a dropped
+   * connection doesn't lose the dictation. Replays a minimal config (mode +
+   * interaction id) and the buffered audio; the server falls back to defaults for
+   * everything else. The buffer survives the failed attempt because it's only
+   * cleared on the next `initialize()` or an explicit `clearInteractionAudio()`.
+   */
+  public async retranscribe(): Promise<{
+    response: any
+    audioBuffer: Buffer
+    sampleRate: number
+  }> {
+    const audioBuffer = this.audioStreamManager.getInteractionAudioBuffer()
+    const sampleRate = this.audioStreamManager.getCurrentSampleRate()
+    if (audioBuffer.length === 0) {
+      throw new Error('No buffered audio to retranscribe')
+    }
+
+    console.log(
+      `[ScribaStreamController] Retrying transcription with ${audioBuffer.length} buffered bytes`,
+    )
+    this.isCancelled = false
+    this.abortController = new AbortController()
+
+    const response = await grpcClient.transcribeStreamV2(
+      this.createReplayGenerator(audioBuffer),
+      this.abortController.signal,
+    )
+
+    return { response, audioBuffer, sampleRate }
+  }
+
+  private async *createReplayGenerator(
+    audioBuffer: Buffer,
+  ): AsyncGenerator<TranscribeStreamRequest> {
+    // Replay a minimal config first (mode + interaction id), then the audio.
+    const interactionId = interactionManager.getCurrentInteractionId()
+    const contextInfo = create(ContextInfoSchema, {})
+    contextInfo.mode = this.currentMode
+    yield create(TranscribeStreamRequestSchema, {
+      payload: {
+        case: 'config',
+        value: create(StreamConfigSchema, {
+          context: contextInfo,
+          interactionId: interactionId || undefined,
+        }),
+      },
+    })
+
+    // Re-chunk well under the proto's 1 MB per-message cap.
+    const CHUNK_SIZE = 32 * 1024
+    for (let offset = 0; offset < audioBuffer.length; offset += CHUNK_SIZE) {
+      if (this.isCancelled) {
+        break
+      }
+      const slice = audioBuffer.subarray(offset, offset + CHUNK_SIZE)
+      yield create(TranscribeStreamRequestSchema, {
+        payload: {
+          case: 'audioData',
+          value: new Uint8Array(slice),
+        },
+      })
+    }
+  }
+
   public getCurrentMode(): ScribaMode {
     return this.currentMode
   }

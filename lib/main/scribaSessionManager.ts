@@ -264,11 +264,31 @@ export class ScribaSessionManager {
         })
         await this.handleTranscriptionResponse(result)
       } catch (error) {
-        console.error(
-          '[scribaSessionManager] Error waiting for stream response:',
-          error,
-        )
-        await this.handleTranscriptionError(error)
+        // A transient network/stream failure shouldn't lose the dictation: retry
+        // once by re-streaming the buffered audio (Wispr's retry-before-giving-up
+        // pattern) before surfacing the error. Auth errors are already handled by
+        // the gRPC client's token-refresh retry; cancellations are intentional.
+        if (this.isTransientError(error)) {
+          console.warn(
+            '[scribaSessionManager] Transcription failed transiently, retrying once...',
+          )
+          try {
+            const retryResult = await scribaStreamController.retranscribe()
+            await this.handleTranscriptionResponse(retryResult)
+          } catch (retryError) {
+            console.error(
+              '[scribaSessionManager] Retry also failed:',
+              retryError,
+            )
+            await this.handleTranscriptionError(retryError)
+          }
+        } else {
+          console.error(
+            '[scribaSessionManager] Error waiting for stream response:',
+            error,
+          )
+          await this.handleTranscriptionError(error)
+        }
       } finally {
         // Always notify processing stopped after handling response
         recordingStateNotifier.notifyProcessingStopped()
@@ -388,6 +408,35 @@ export class ScribaSessionManager {
       default:
         return error?.message || 'Transcription failed'
     }
+  }
+
+  /**
+   * True for transient stream failures worth one automatic retry. Excludes auth
+   * errors (the gRPC client already refreshes + retries those) and intentional
+   * cancellations/aborts (which must not be retried).
+   */
+  private isTransientError(error: any): boolean {
+    const msg = (error?.message || '').toLowerCase()
+    if (
+      msg.includes('unauthenticated') ||
+      msg.includes('unauthorized') ||
+      msg.includes('401')
+    ) {
+      return false
+    }
+    if (msg.includes('cancel') || msg.includes('abort')) {
+      return false
+    }
+    return (
+      msg.includes('network') ||
+      msg.includes('fetch failed') ||
+      msg.includes('failed to fetch') ||
+      msg.includes('econnrefused') ||
+      msg.includes('econnreset') ||
+      msg.includes('unavailable') ||
+      msg.includes('timeout') ||
+      msg.includes('socket hang up')
+    )
   }
 
   /** Maps a thrown exception (stream/network/auth) to a short user-facing message. */

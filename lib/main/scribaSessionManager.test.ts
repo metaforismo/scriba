@@ -44,6 +44,13 @@ const mockScribaStreamController = {
   endInteraction: mock(),
   cancelTranscription: mock(),
   clearInteractionAudio: mock(),
+  retranscribe: mock(() =>
+    Promise.resolve({
+      response: { transcript: 'retried transcript' },
+      audioBuffer: Buffer.from('audio-data'),
+      sampleRate: 16000,
+    }),
+  ),
 }
 mock.module('./scribaStreamController', () => ({
   scribaStreamController: mockScribaStreamController,
@@ -160,6 +167,11 @@ describe('scribaSessionManager', () => {
       sampleRate: 16000,
     })
     mockScribaStreamController.getAudioDurationMs.mockReturnValue(1000)
+    mockScribaStreamController.retranscribe.mockResolvedValue({
+      response: { transcript: 'retried transcript' },
+      audioBuffer: Buffer.from('audio-data'),
+      sampleRate: 16000,
+    })
     mockTextInserter.insertText.mockResolvedValue(true)
     mockInteractionManager.getCurrentInteractionId.mockReturnValue(null)
     mockInteractionManager.initialize.mockReturnValue('test-interaction-123')
@@ -484,8 +496,9 @@ describe('scribaSessionManager', () => {
     expect(mockInteractionManager.clearCurrentInteraction).toHaveBeenCalled()
   })
 
-  test('should handle unexpected transcription error', async () => {
-    const error = new Error('Network timeout')
+  test('should handle unexpected transcription error (non-transient, no retry)', async () => {
+    // A non-network error is surfaced immediately without a retry.
+    const error = new Error('Something unexpected broke')
     mockScribaStreamController.startGrpcStream.mockRejectedValueOnce(error)
 
     const { ScribaSessionManager } = await import('./scribaSessionManager')
@@ -494,8 +507,67 @@ describe('scribaSessionManager', () => {
     await session.startSession(ScribaMode.TRANSCRIBE)
     await session.completeSession()
 
-    expect(mockScribaStreamController.endInteraction).toHaveBeenCalled()
+    expect(mockScribaStreamController.retranscribe).not.toHaveBeenCalled()
+    expect(mockRecordingStateNotifier.notifyError).toHaveBeenCalled()
     expect(mockInteractionManager.clearCurrentInteraction).toHaveBeenCalled()
+  })
+
+  test('retries once on a transient error and inserts the recovered transcript', async () => {
+    // First attempt fails transiently; the retry re-streams the buffered audio.
+    mockScribaStreamController.startGrpcStream.mockRejectedValueOnce(
+      new Error('fetch failed: network error'),
+    )
+    mockScribaStreamController.retranscribe.mockResolvedValueOnce({
+      response: { transcript: 'recovered text' },
+      audioBuffer: Buffer.from('audio-data'),
+      sampleRate: 16000,
+    })
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await session.completeSession()
+
+    expect(mockScribaStreamController.retranscribe).toHaveBeenCalledTimes(1)
+    expect(mockTextInserter.insertText).toHaveBeenCalledWith('recovered text')
+    // No error shown to the user since the retry recovered the dictation.
+    expect(mockRecordingStateNotifier.notifyError).not.toHaveBeenCalled()
+  })
+
+  test('surfaces the error when the retry also fails', async () => {
+    mockScribaStreamController.startGrpcStream.mockRejectedValueOnce(
+      new Error('network unavailable'),
+    )
+    mockScribaStreamController.retranscribe.mockRejectedValueOnce(
+      new Error('network unavailable'),
+    )
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await session.completeSession()
+
+    expect(mockScribaStreamController.retranscribe).toHaveBeenCalledTimes(1)
+    expect(mockTextInserter.insertText).not.toHaveBeenCalled()
+    expect(mockRecordingStateNotifier.notifyError).toHaveBeenCalled()
+    expect(mockInteractionManager.clearCurrentInteraction).toHaveBeenCalled()
+  })
+
+  test('does not retry on an auth error (handled by the gRPC client)', async () => {
+    mockScribaStreamController.startGrpcStream.mockRejectedValueOnce(
+      new Error('unauthenticated'),
+    )
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await session.completeSession()
+
+    expect(mockScribaStreamController.retranscribe).not.toHaveBeenCalled()
+    expect(mockRecordingStateNotifier.notifyError).toHaveBeenCalled()
   })
 
   test('should skip text insertion when no transcript', async () => {
