@@ -58,7 +58,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 - [ ] **Verbatim ↔ light ↔ heavy cleanup toggle** (per-app optionally). Directly targets Wispr's over-editing complaint.
 - [ ] **Streaming / interim transcripts.** Server buffers ALL audio then one Whisper call (`transcribeStreamV2Handler.ts:88-108`) — no partial results. Re-architect toward streaming ASR for the ~700ms feel.
 - [ ] **ASR provider failover** (Groq down → fallback). Today `providerUtils.ts:20` just throws; single provider.
-- [ ] **Mode detection robustness** — `detectScribaMode` substring-matches "hey scriba" in first 5 words (`helpers.ts:161`); misfires + no other commands.
+- [x] **Mode detection robustness** — `detectScribaMode` now anchors the "hey scriba" wake phrase to the *start* of the utterance (was: substring anywhere in first 5 words → false EDIT on mid-sentence mentions), tolerating leading punctuation, an inner comma, and common ASR mishears (scribe/scribah/scribba). Also hardened `getScribaMode` to reject non-enum numbers. +9 tests (`helpers.test.ts`). *(iter 7)*. Still TODO: other spoken commands beyond the single wake phrase.
 
 ### P2 — Power features (match Wispr)
 - [ ] **Command Mode**: select → hotkey → spoken instruction → replace selection / insert at cursor. translate/summarize/tone + "press enter".
@@ -94,6 +94,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 7 — 2026-06-10
+- **Fix (P1, mode detection):** `detectScribaMode` matched `hey scriba` *anywhere* in the first 5 words, so a mid-dictation mention ("I told him hey Scriba is great") wrongly flipped the whole utterance into EDIT/command mode, while any ASR mishearing ("hey scribe") was missed entirely. It now requires the wake phrase at the **start** of the utterance (wake words are always spoken first), tolerating leading punctuation/whitespace, a comma between the two words, and the common `scribe`/`scribah`/`scribba` mishears — and it no longer false-matches `scribble`/`script`. Also hardened `getScribaMode` to accept only real `ScribaMode` enum members (a stray `"7"` previously became an invalid mode that indexed `SCRIBA_MODE_PROMPT[mode]` as `undefined`). New `helpers.test.ts` (+9 tests).
+- **Note (user decision):** external `heyito` org/domain URLs are intentionally left as-is for now (user chose "leave them"); code rename is otherwise complete.
+- **Next:** P1 — AI auto-formatting on by default + verbatim/light/heavy cleanup toggle (Wispr's signature cleanup layer), or the network retry/queue (audio still dropped on a thrown stream error). The auto-formatting change alters default product behavior (latency + cost), so it warrants a design note / user check before defaulting it on.
 
 ### Iteration 6 — 2026-06-10 (UI/UX + edge-case + bug sweep)
 Ran a 3-layer audit (renderer / main-process / server) and fixed the top correctness issues across all of them. **The whole test suite (lib + server + app) is green** — and `node_modules` is now installed, so tests actually run in this env (`bun test --preload lib/__tests__/setup.ts <file>` for lib; plain `bun test` for server).
