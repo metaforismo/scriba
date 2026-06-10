@@ -162,6 +162,31 @@ describe('transcription', () => {
       }
     })
 
+    it('keeps only whole terms when truncating (never a partial term)', () => {
+      const vocabulary = Array.from({ length: 300 }, (_, i) => `term${i}`)
+      const result = createTranscriptionPrompt(vocabulary)
+
+      const vocabPart = result
+        .replace('Dictionary entries include: ', '')
+        .replace(/\.\s*$/, '')
+      // Every kept term is a complete `term<number>` — no partial fragments.
+      for (const term of vocabPart.split(', ')) {
+        expect(term).toMatch(/^term\d+$/)
+      }
+    })
+
+    it('truncates non-ASCII vocab that the naive chars/4 estimate would let overflow', () => {
+      // ~120 two-char CJK terms ≈ 478 chars. chars/4 ≈ 120 tokens (would fit),
+      // but CJK is ~1 token/char, so the conservative estimate (~300 tokens)
+      // correctly truncates instead of overflowing Whisper's 224-token cap.
+      const vocabulary = Array.from({ length: 120 }, () => '试验')
+      createTranscriptionPrompt(vocabulary)
+
+      expect(consoleLogs.some(log => log.includes('Vocabulary truncated'))).toBe(
+        true,
+      )
+    })
+
     it('should return simple prompt when vocabulary becomes empty after processing', () => {
       // Test edge case where vocabulary might be filtered to empty
       const vocabulary = [''] // This should be filtered out or result in empty vocab
