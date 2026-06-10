@@ -950,6 +950,87 @@ describe('Keyboard Module', () => {
     })
   })
 
+  describe('Escape cancels an in-progress dictation', () => {
+    const cmdSpaceShortcut = {
+      isShortcutGloballyEnabled: true,
+      keyboardShortcuts: [
+        {
+          id: 'esc-test',
+          keys: ['command', 'space'],
+          mode: ScribaMode.TRANSCRIBE,
+        },
+      ],
+    }
+    const emit = (event: object) =>
+      mockChildProcess.stdout.emit(
+        'data',
+        Buffer.from(JSON.stringify(event) + '\n'),
+      )
+    const down = (key: string) => emit({ type: 'keydown', key, raw_code: 0 })
+    const up = (key: string) => emit({ type: 'keyup', key, raw_code: 0 })
+
+    test('Escape cancels (not completes) the active session', async () => {
+      mockMainStore.get.mockReturnValue(cmdSpaceShortcut)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      down('MetaLeft')
+      down('Space')
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+
+      down('Escape')
+      expect(mockScribaSessionManager.cancelSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      // Releasing the still-held hotkey afterwards must NOT complete a session.
+      up('Space')
+      up('MetaLeft')
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+    })
+
+    test('the still-held combo does not immediately re-trigger after cancel', async () => {
+      mockMainStore.get.mockReturnValue(cmdSpaceShortcut)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      down('MetaLeft')
+      down('Space')
+      down('Escape')
+      up('Escape') // combo (command+space) still physically held
+
+      // Still suppressed — exactly one session was ever started.
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+    })
+
+    test('a fresh press after full release dictates again', async () => {
+      mockMainStore.get.mockReturnValue(cmdSpaceShortcut)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      down('MetaLeft')
+      down('Space')
+      down('Escape')
+      // Release everything -> suppression clears.
+      up('Space')
+      up('MetaLeft')
+
+      // Fresh press starts a new session.
+      down('MetaLeft')
+      down('Space')
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(2)
+    })
+
+    test('Escape with no active dictation does nothing', async () => {
+      mockMainStore.get.mockReturnValue(cmdSpaceShortcut)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      down('Escape')
+      expect(mockScribaSessionManager.cancelSession).not.toHaveBeenCalled()
+      expect(mockScribaSessionManager.startSession).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Key Normalization Business Logic', () => {
     test('should normalize legacy modifier keys to left variants', async () => {
       mockMainStore.get.mockReturnValue({

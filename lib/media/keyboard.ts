@@ -29,6 +29,10 @@ type ProcessEvent = KeyEvent | HeartbeatEvent | RegisteredHotkeysEvent
 // Global key listener process singleton
 export let KeyListenerProcess: ReturnType<typeof spawn> | null = null
 let activeShortcutId: string | null = null
+// Set when a dictation is cancelled (Escape) while its hotkey is still held, so
+// the still-pressed combo doesn't immediately re-trigger a new session. Cleared
+// once all keys are released.
+let dictationSuppressed = false
 
 // Heartbeat monitoring state
 let lastHeartbeatReceived = Date.now()
@@ -41,6 +45,7 @@ export const resetForTesting = () => {
   if (process.env.NODE_ENV !== 'production') {
     KeyListenerProcess = null
     activeShortcutId = null
+    dictationSuppressed = false
     pressedKeys.clear()
     keyPressTimestamps.clear()
     stopStuckKeyChecker()
@@ -206,6 +211,21 @@ function handleKeyEventInMain(event: KeyEvent) {
   // Ignore the "fast fn" event which can be noisy.
   if (normalizedKey === 'fn_fast') return
 
+  // Escape cancels an in-progress dictation (discard the audio, don't transcribe).
+  // The hotkey is typically still held, so suppress reactivation until it's
+  // released; pressedKeys keeps tracking the held keys so de-dup still works.
+  if (
+    event.type === 'keydown' &&
+    normalizedKey === 'esc' &&
+    activeShortcutId !== null
+  ) {
+    console.info('Escape pressed during dictation, cancelling...')
+    activeShortcutId = null
+    dictationSuppressed = true
+    scribaSessionManager.cancelSession()
+    return
+  }
+
   if (event.type === 'keydown') {
     // Ignore OS key-repeat: a held key emits repeated keydowns, and re-running
     // the shortcut match on each one is wasted work (the pressed-set is
@@ -219,6 +239,10 @@ function handleKeyEventInMain(event: KeyEvent) {
   } else {
     pressedKeys.delete(normalizedKey)
     keyPressTimestamps.delete(normalizedKey)
+    // Once every key is released, a future fresh press may dictate again.
+    if (pressedKeys.size === 0) {
+      dictationSuppressed = false
+    }
   }
 
   // Check if any of the configured shortcuts are currently held
@@ -243,6 +267,9 @@ function handleKeyEventInMain(event: KeyEvent) {
   // Handle shortcut activation and mode changes
   if (currentlyHeldShortcut) {
     if (activeShortcutId === null) {
+      // A dictation was just cancelled with Escape; wait for a full key release
+      // before allowing the still-held combo to start a new session.
+      if (dictationSuppressed) return
       // Starting a new session
       activeShortcutId = currentlyHeldShortcut.id
       console.info('lib Shortcut ACTIVATED, starting recording...')
@@ -468,6 +495,7 @@ export const stopKeyListener = () => {
     // Clear the set on stop to prevent stuck keys if the app restarts.
     pressedKeys.clear()
     keyPressTimestamps.clear()
+    dictationSuppressed = false
     stopStuckKeyChecker()
 
     // Clean up heartbeat state
