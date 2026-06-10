@@ -84,6 +84,13 @@ export class SyncService {
       const lastSyncedAt =
         (await KeyValueStore.get(lastSyncedAtKey)) || new Date(0).toISOString()
 
+      // Capture the watermark BEFORE the (multi-second) push/pull. Using the
+      // sync-end time instead would skip any row modified during the sync window
+      // (its updated_at < end time) until it's touched again — silent data loss.
+      // Advancing only to the start time re-checks those rows next cycle; that's
+      // idempotent because the upserts are keyed on the row id.
+      const syncStartedAt = new Date().toISOString()
+
       // =================================================================
       // PUSH LOCAL CHANGES
       // =================================================================
@@ -105,8 +112,7 @@ export class SyncService {
       await this.syncAdvancedSettings(lastSyncedAt)
 
       if (processedChanges > 0) {
-        const newSyncTimestamp = new Date().toISOString()
-        await KeyValueStore.set(lastSyncedAtKey, newSyncTimestamp)
+        await KeyValueStore.set(lastSyncedAtKey, syncStartedAt)
       }
     } catch (error) {
       console.error('Sync cycle failed:', error)

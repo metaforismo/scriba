@@ -630,6 +630,41 @@ describe('SyncService Integration Tests', () => {
       expect(timestamp).toBeGreaterThanOrEqual(startTime)
       expect(timestamp).toBeLessThanOrEqual(endTime)
     })
+
+    test('advances the watermark to the sync START time, not the end (no skipped edits)', async () => {
+      const remoteNote = {
+        id: 'remote-note-watermark',
+        userId: 'test-user-123',
+        content: 'Remote note',
+        createdAt: '2024-01-02T00:00:00.000Z',
+        updatedAt: '2024-01-02T00:00:00.000Z',
+        deletedAt: null,
+        interactionId: null,
+      }
+      mockGrpcClient.listNotesSince.mockResolvedValueOnce([remoteNote])
+      mockGrpcClient.listInteractionsSince.mockResolvedValue([])
+
+      // Make a pull take measurable time and record when it actually finished.
+      let pullFinishedAt = 0
+      mockGrpcClient.listDictionaryItemsSince.mockImplementationOnce(
+        async () => {
+          await new Promise(resolve => setTimeout(resolve, 40))
+          pullFinishedAt = Date.now()
+          return []
+        },
+      )
+
+      await syncService.start()
+
+      expect(mockKeyValueStore.set).toHaveBeenCalledTimes(1)
+      const watermark = new Date(
+        mockKeyValueStore.set.mock.calls[0][1] as string,
+      ).getTime()
+      // The watermark is the sync start, captured before the slow pull finished;
+      // the old (sync-end) behavior would store a time >= pullFinishedAt and skip
+      // any row edited during that window.
+      expect(watermark).toBeLessThan(pullFinishedAt)
+    })
   })
 
   describe('Singleton Pattern Business Logic', () => {
