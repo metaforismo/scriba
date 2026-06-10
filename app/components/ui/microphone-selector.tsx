@@ -44,14 +44,19 @@ export function MicrophoneSelector({
     selectedDeviceId || 'default',
   )
   const [isOpen, setIsOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
     const loadMicrophones = async () => {
+      setIsLoading(true)
       try {
         const mics = await getAvailableMicrophones()
         setAvailableMicrophones(mics)
       } catch (error) {
         console.error('Failed to load microphones:', error)
+        setAvailableMicrophones([])
+      } finally {
+        setIsLoading(false)
       }
     }
     // Only load microphones when the dialog is opened
@@ -116,36 +121,47 @@ export function MicrophoneSelector({
           Choose a microphone from the list below to use for voice input
         </DialogDescription>
         <div className="max-h-[60vh] overflow-y-auto space-y-3 pl-8 pr-6 pt-8">
-          {availableMicrophones.map(mic => {
-            const { title, description } = microphoneToRender(mic)
-            return (
-              <div
-                key={mic.deviceId}
-                className={`p-6 rounded-md cursor-pointer transition-colors max-w-full overflow-hidden ${
-                  tempSelectedMicrophone === mic.deviceId
-                    ? 'bg-purple-50 border-2 border-purple-100'
-                    : 'bg-neutral-100 border-2 border-neutral-100 hover:bg-neutral-200'
-                }`}
-                onClick={() => handleMicrophoneSelect(mic.deviceId)}
-                style={{ minWidth: 0 }}
-              >
+          {isLoading ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Loading microphones…
+            </div>
+          ) : availableMicrophones.length === 0 ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              No microphones found. Check that a microphone is connected and
+              that Scriba has microphone permission.
+            </div>
+          ) : (
+            availableMicrophones.map(mic => {
+              const { title, description } = microphoneToRender(mic)
+              return (
                 <div
-                  className="font-medium text-base truncate"
-                  style={{ maxWidth: '100%' }}
+                  key={mic.deviceId}
+                  className={`p-6 rounded-md cursor-pointer transition-colors max-w-full overflow-hidden ${
+                    tempSelectedMicrophone === mic.deviceId
+                      ? 'bg-purple-50 border-2 border-purple-100'
+                      : 'bg-neutral-100 border-2 border-neutral-100 hover:bg-neutral-200'
+                  }`}
+                  onClick={() => handleMicrophoneSelect(mic.deviceId)}
+                  style={{ minWidth: 0 }}
                 >
-                  {title}
-                </div>
-                {description && (
                   <div
-                    className="text-sm text-muted-foreground text-wrap mt-2"
+                    className="font-medium text-base truncate"
                     style={{ maxWidth: '100%' }}
                   >
-                    {description}
+                    {title}
                   </div>
-                )}
-              </div>
-            )
-          })}
+                  {description && (
+                    <div
+                      className="text-sm text-muted-foreground text-wrap mt-2"
+                      style={{ maxWidth: '100%' }}
+                    >
+                      {description}
+                    </div>
+                  )}
+                </div>
+              )
+            })
+          )}
         </div>
         <div className="flex justify-end px-8 pb-8 pt-6">
           <DialogClose asChild>
