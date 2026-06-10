@@ -49,6 +49,14 @@ When you receive a transcript, immediately return the polished version following
 
   // Audio quality thresholds
   noSpeechThreshold: 0.6,
+
+  // Transcript cleanup level applied in dictation (TRANSCRIBE) mode:
+  //   'verbatim' -> insert the raw ASR transcript unchanged (fastest, no LLM call)
+  //   'light'    -> remove fillers/false-starts + fix punctuation & capitalization,
+  //                 keep the user's wording
+  //   'heavy'    -> additionally tighten, restructure and format for readability
+  // Default 'verbatim' so dictation behavior/cost is unchanged until the user opts in.
+  transcriptCleanupLevel: 'verbatim',
 }
 
 module.exports = { DEFAULT_ADVANCED_SETTINGS }

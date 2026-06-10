@@ -10,6 +10,8 @@ import {
   NoSpeechThresholdSchema,
   VocabularySchema,
   VocabularyArraySchema,
+  TranscriptCleanupLevelSchema,
+  type TranscriptCleanupLevel,
 } from './schemas.js'
 
 /**
@@ -138,5 +140,15 @@ export class HeaderValidator {
    */
   static validateVocabularyArray(words: string[]): string[] {
     return VocabularyArraySchema.parse(words ?? [])
+  }
+
+  /**
+   * Resolves the transcript cleanup level from a header value. Never throws:
+   * an unknown or missing value degrades to 'verbatim' (raw transcript).
+   */
+  static validateCleanupLevel(
+    headerValue: string | null | undefined,
+  ): TranscriptCleanupLevel {
+    return TranscriptCleanupLevelSchema.parse(headerValue ?? undefined)
   }
 }

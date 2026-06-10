@@ -102,6 +102,17 @@ export const VocabularyArraySchema = z
       }),
   )
 
+// Transcript cleanup level for dictation mode. Never throws: any unknown value
+// (or a missing header) degrades to the safe 'verbatim' default.
+export const TranscriptCleanupLevelSchema = z
+  .preprocess(
+    val => (typeof val === 'string' ? val.trim().toLowerCase() : val),
+    z.enum(['verbatim', 'light', 'heavy']),
+  )
+  .catch('verbatim')
+
+export type TranscriptCleanupLevel = z.infer<typeof TranscriptCleanupLevelSchema>
+
 // Header validation schema
 export const HeaderSchema = z.object({
   asrModel: AsrModelSchema.optional(),

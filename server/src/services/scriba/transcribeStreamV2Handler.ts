@@ -17,7 +17,12 @@ import {
   detectScribaMode,
   getPromptForMode,
 } from './helpers.js'
-import { SCRIBA_MODE_SYSTEM_PROMPT } from './constants.js'
+import {
+  SCRIBA_MODE_SYSTEM_PROMPT,
+  TRANSCRIPT_CLEANUP_PROMPT,
+  TRANSCRIPT_CLEANUP_SYSTEM_PROMPT,
+} from './constants.js'
+import type { TranscriptCleanupLevel } from '../../validation/schemas.js'
 import type { ScribaContext } from './types.js'
 import { isAbortError, createAbortError } from '../../utils/abortUtils.js'
 import {
@@ -59,6 +64,12 @@ export class TranscribeStreamV2Handler {
     // Extract interaction ID and user ID for timing
     const interactionId = initialConfig?.interactionId
     const userId = context?.values.get(kUser)?.sub
+
+    // Dictation cleanup level (verbatim | light | heavy), passed as a request
+    // header so it requires no proto change. Defaults to verbatim on anything odd.
+    const cleanupLevel = HeaderValidator.validateCleanupLevel(
+      context?.requestHeader.get('transcript-cleanup-level'),
+    )
 
     // Initialize timing collection
     serverTimingCollector.startInteraction(interactionId, userId)
@@ -146,6 +157,17 @@ export class TranscribeStreamV2Handler {
         windowContext,
         advancedSettings,
       )
+
+      // Optional dictation cleanup pass (verbatim | light | heavy). Driven by a
+      // request header so it needs no proto change; only runs in TRANSCRIBE mode
+      // (EDIT already does its own LLM adjustment above).
+      if (mode === ScribaMode.TRANSCRIBE && cleanupLevel !== 'verbatim') {
+        transcript = await serverTimingCollector.timeAsync(
+          ServerTimingEventName.LLM_ADJUSTMENT,
+          () => this.cleanupTranscript(transcript, cleanupLevel, advancedSettings),
+          interactionId,
+        )
+      }
 
       const duration = Date.now() - startTime
 
@@ -421,6 +443,49 @@ export class TranscribeStreamV2Handler {
     )
 
     return adjustedTranscript
+  }
+
+  /**
+   * Runs the optional dictation cleanup pass (light/heavy) over a TRANSCRIBE-mode
+   * transcript. Best-effort: on an empty transcript, an LLM error, or empty LLM
+   * output it returns the raw transcript so cleanup can never lose or blank a
+   * dictation.
+   */
+  private async cleanupTranscript(
+    transcript: string,
+    level: Exclude<TranscriptCleanupLevel, 'verbatim'>,
+    advancedSettings: ReturnType<typeof this.prepareAdvancedSettings>,
+  ): Promise<string> {
+    if (!transcript.trim()) {
+      return transcript
+    }
+
+    const instruction = TRANSCRIPT_CLEANUP_PROMPT[level]
+    const llmProvider = getLlmProvider(advancedSettings.llmProvider)
+
+    try {
+      const cleaned = await llmProvider.adjustTranscript(
+        `${instruction}\n\nTranscript:\n${transcript}`,
+        {
+          temperature: advancedSettings.llmTemperature,
+          model: advancedSettings.llmModel,
+          prompt: TRANSCRIPT_CLEANUP_SYSTEM_PROMPT,
+        },
+      )
+
+      console.log(
+        `🧹 [${new Date().toISOString()}] Cleaned transcript (${level}): "${cleaned}"`,
+      )
+
+      // Never replace a real dictation with empty output.
+      return cleaned && cleaned.trim() ? cleaned : transcript
+    } catch (error) {
+      console.error(
+        `[${new Date().toISOString()}] Transcript cleanup (${level}) failed, using raw transcript:`,
+        error,
+      )
+      return transcript
+    }
   }
 
   private mergeStreamConfigs(

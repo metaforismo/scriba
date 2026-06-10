@@ -1,5 +1,6 @@
 import {
   LlmSettings,
+  TranscriptCleanupLevel,
   useAdvancedSettingsStore,
 } from '@/app/store/useAdvancedSettingsStore'
 import {
@@ -326,6 +327,25 @@ export default function AdvancedSettingsContent() {
     ],
   )
 
+  const handleCleanupLevelChange = useCallback(
+    (level: TranscriptCleanupLevel) => {
+      const updatedLlm = { ...llm, transcriptCleanupLevel: level }
+      setLlmSettings({ transcriptCleanupLevel: level })
+      scheduleAdvancedSettingsUpdate(
+        updatedLlm,
+        grammarServiceEnabled,
+        macosAccessibilityContextEnabled,
+      )
+    },
+    [
+      llm,
+      grammarServiceEnabled,
+      macosAccessibilityContextEnabled,
+      setLlmSettings,
+      scheduleAdvancedSettingsUpdate,
+    ],
+  )
+
   const handleRestoreDefaults = useCallback(() => {
     const defaultLlmSettings: LlmSettings = {
       asrProvider: null,
@@ -337,6 +357,7 @@ export default function AdvancedSettingsContent() {
       transcriptionPrompt: null,
       editingPrompt: null,
       noSpeechThreshold: null,
+      transcriptCleanupLevel: 'verbatim',
     }
     setLlmSettings(defaultLlmSettings)
     scheduleAdvancedSettingsUpdate(
@@ -374,6 +395,42 @@ export default function AdvancedSettingsContent() {
                 onChange={handleInputChange}
               />
             ))}
+          </div>
+
+          {/* Dictation cleanup level (verbatim / light / heavy) */}
+          <div className="mt-5 ml-1 mr-1">
+            <label className="block text-sm font-medium text-slate-700">
+              Dictation cleanup
+            </label>
+            <p className="text-xs text-slate-500 mt-1 mb-2">
+              How much AI polishing is applied to dictation before it&apos;s
+              inserted. Verbatim is fastest and inserts your words as-is; Light
+              removes filler and fixes punctuation; Heavy also tightens and
+              formats for readability.
+            </p>
+            <div className="inline-flex rounded-md border border-slate-300 overflow-hidden">
+              {(['verbatim', 'light', 'heavy'] as TranscriptCleanupLevel[]).map(
+                level => {
+                  const active =
+                    (llm.transcriptCleanupLevel ?? 'verbatim') === level
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => handleCleanupLevelChange(level)}
+                      className={`px-4 py-1.5 text-sm capitalize transition-colors border-r border-slate-300 last:border-r-0 ${
+                        active
+                          ? 'bg-slate-900 text-white'
+                          : 'bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {level}
+                    </button>
+                  )
+                },
+              )}
+            </div>
           </div>
         </div>
 

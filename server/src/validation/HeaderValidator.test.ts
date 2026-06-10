@@ -157,6 +157,21 @@ describe('HeaderValidator', () => {
     })
   })
 
+  describe('validateCleanupLevel', () => {
+    it('accepts the three valid levels (case/space-insensitive)', () => {
+      expect(HeaderValidator.validateCleanupLevel('verbatim')).toBe('verbatim')
+      expect(HeaderValidator.validateCleanupLevel('light')).toBe('light')
+      expect(HeaderValidator.validateCleanupLevel(' HEAVY ')).toBe('heavy')
+    })
+
+    it('defaults to verbatim for unknown/missing values (never throws)', () => {
+      expect(HeaderValidator.validateCleanupLevel('bogus')).toBe('verbatim')
+      expect(HeaderValidator.validateCleanupLevel(null)).toBe('verbatim')
+      expect(HeaderValidator.validateCleanupLevel(undefined)).toBe('verbatim')
+      expect(HeaderValidator.validateCleanupLevel('')).toBe('verbatim')
+    })
+  })
+
   describe('validateAsrProvider', () => {
     it('should return valid ASR provider names', () => {
       expect(HeaderValidator.validateAsrProvider('groq')).toBe('groq')

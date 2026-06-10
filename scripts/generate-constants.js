@@ -35,6 +35,9 @@ export const DEFAULT_ADVANCED_SETTINGS = {
   
   // Audio quality thresholds
   noSpeechThreshold: ${DEFAULT_ADVANCED_SETTINGS.noSpeechThreshold},
+
+  // Transcript cleanup level for dictation mode: 'verbatim' | 'light' | 'heavy'
+  transcriptCleanupLevel: '${DEFAULT_ADVANCED_SETTINGS.transcriptCleanupLevel}',
 } as const;
 `
 

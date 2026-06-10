@@ -293,8 +293,15 @@ class GrpcClient {
     signal?: AbortSignal,
   ) {
     return this.withRetry(async () => {
+      const headers = this.getHeaders()
+      // Cleanup level rides along as metadata (no proto change). Only send a
+      // concrete value; absent/verbatim means the server inserts the raw transcript.
+      const cleanupLevel = getAdvancedSettings().llm.transcriptCleanupLevel
+      if (cleanupLevel) {
+        headers.set('transcript-cleanup-level', cleanupLevel)
+      }
       const response = await this.client.transcribeStreamV2(stream, {
-        headers: this.getHeaders(),
+        headers,
         signal,
       })
       return response

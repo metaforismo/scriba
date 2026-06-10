@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { STORE_KEYS } from '../../lib/constants/store-keys'
 
+export type TranscriptCleanupLevel = 'verbatim' | 'light' | 'heavy'
+
 export interface LlmSettings {
   asrProvider: string | null
   asrModel: string | null
@@ -11,6 +13,10 @@ export interface LlmSettings {
   transcriptionPrompt: string | null
   editingPrompt: string | null
   noSpeechThreshold: number | null
+  // Dictation cleanup level applied server-side: 'verbatim' inserts the raw
+  // transcript; 'light'/'heavy' run an LLM polish pass. Optional/null/absent is
+  // treated as verbatim (e.g. settings stored before this field existed).
+  transcriptCleanupLevel?: TranscriptCleanupLevel | null
 }
 
 interface AdvancedSettingsState {

@@ -158,6 +158,7 @@ export const defaultValues: AppStore = {
       transcriptionPrompt: null,
       editingPrompt: null,
       noSpeechThreshold: null,
+      transcriptCleanupLevel: 'verbatim',
     },
   },
   openMic: false,

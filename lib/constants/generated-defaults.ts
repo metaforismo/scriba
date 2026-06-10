@@ -50,4 +50,7 @@ When you receive a transcript, immediately return the polished version following
 
   // Audio quality thresholds
   noSpeechThreshold: 0.6,
+
+  // Transcript cleanup level for dictation mode: 'verbatim' | 'light' | 'heavy'
+  transcriptCleanupLevel: 'verbatim',
 } as const
