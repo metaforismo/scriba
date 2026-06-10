@@ -69,7 +69,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ### P3 — Mobile (new platforms)
 - [x] **Stack decided: native iOS (Swift)** — user chose native iOS. Started in `ios/` (XcodeGen: container app + keyboard extension + shared layer). *(PR #1, iter 13)*
-- [~] **iOS**: keyboard extension w/ Full Access + mic + live waveform + record→`/v1/transcribe`→insert (PR #1), **real Auth0 sign-in** (PKCE via `ASWebAuthenticationSession`, shared-Keychain tokens — PR #2), cleanup-level parity (iter 14), **self-healing 401 refresh** in the keyboard (PR #3). Remaining: live streaming/interim results, auto-fallback for number/phone/email fields, app icon/assets, on-device testing. Don't break repeat-dictation/external keyboards (their App Store complaint).
+- [~] **iOS**: keyboard extension w/ Full Access + mic + live waveform + record→`/v1/transcribe`→insert (PR #1), **real Auth0 sign-in** (PKCE — PR #2), cleanup-level parity (iter 14), **self-healing 401 refresh** (PR #3), **system-keyboard fallback for numeric/secure fields** (PR #4). Remaining: live streaming/interim results, app icon/assets, on-device testing. Don't break repeat-dictation/external keyboards (their App Store complaint).
 - [ ] **Android**: floating-bubble overlay (don't replace Gboard); Accessibility direct-insert + clipboard fallback; tap-toggle + press-hold; OEM background-kill onboarding.
 - [ ] **Free unlimited mobile tier** as a land-grab (Wispr did this on Android).
 - [ ] Reuse server: the gRPC `ScribaService.TranscribeStreamV2` + auth already exist; mobile clients can target the same backend.
@@ -94,6 +94,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 17 — 2026-06-10 (iOS field fallback) — PR #4
+- **Feat (iOS, Wispr parity):** the keyboard now falls back to the system keyboard for **numeric/secure** fields (dictation is useless for phone numbers/passwords). New `KeyboardContext`/`FieldMode` derived from the host field's traits (`textDocumentProxy.keyboardType` + `isSecureTextEntry`), recomputed on `viewWillAppear`/`textDidChange`; for those fields `KeyboardView` hides the mic and shows a "Switch keyboard" (globe) prompt.
+- **Workflow:** `feat/ios-field-fallback` → **PR #4** → merged. iOS-only, correct-by-inspection.
+- **Next:** the big one — live streaming / interim transcripts (the Wispr "live" feel; server streaming + iOS partials), or back to testable desktop/server fixes.
 
 ### Iteration 16 — 2026-06-10 (iOS self-healing auth) — PR #3
 - **Feat (iOS):** the keyboard now **refreshes an expired token and retries** instead of surfacing "please sign in" and forcing the user back into the app. Moved the non-interactive refresh into the **Shared** layer (`Auth0Config` → Shared; new `TokenRefresher` + `Auth0TokenEndpoint`) so the extension can use it; added the `AUTH0_*` keys to the keyboard's Info.plist. `TranscriptionClient` retries once on a 401 after a refresh (`allowRefresh` guards loops); `AuthService` now delegates refresh + token POST to the shared code (removing duplication).
