@@ -13,8 +13,13 @@ native/**/target
 native/target-rust-analyzer
 native/**/.build
 out.json
+*.tsbuildinfo
 tsconfig.node.tsbuildinfo
 server/deploy-dev.sh
+
+# CDK context cache — regenerable, and pins account/zone/domain identifiers we
+# don't need to publish. CDK recreates it locally on synth.
+server/infra/cdk.context.json
 
 # Sentry Config File
 .env.sentry-build-plugin

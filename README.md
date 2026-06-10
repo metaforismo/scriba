@@ -12,7 +12,7 @@
   <p>
     <img alt="macOS" src="https://img.shields.io/badge/macOS-supported-blue?logo=apple&logoColor=white">
     <img alt="Windows" src="https://img.shields.io/badge/Windows-supported-blue?logo=windows&logoColor=white">
-    <img alt="Version" src="https://img.shields.io/badge/version-0.2.0-green">
+    <img alt="Version" src="https://img.shields.io/badge/version-0.2.3-green">
     <img alt="License" src="https://img.shields.io/badge/license-GPL-blue">
   </p>
 </div>
@@ -34,6 +34,9 @@
 - **Context awareness**: Learns from your usage patterns to improve accuracy
 - **Multi-language support**: Transcribe in multiple languages
 - **Intelligent punctuation**: Automatically adds appropriate punctuation
+- **Adjustable cleanup**: Choose how much the AI polishes your dictation —
+  **Verbatim** (raw, no LLM), **Light** (remove filler, fix punctuation), or
+  **Heavy** (tighten and format for readability)
 
 ### ⚙️ **Powerful Customization**
 
