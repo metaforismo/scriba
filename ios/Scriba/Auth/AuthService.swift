@@ -59,16 +59,11 @@ final class AuthService: NSObject {
     /// credentials, or nil if there's nothing to refresh.
     @discardableResult
     func refreshIfNeeded() async throws -> Credentials? {
-        guard let current = TokenStore.load(),
-            let refreshToken = current.refreshToken
-        else { return nil }
+        guard let current = TokenStore.load(), current.refreshToken != nil else {
+            return nil
+        }
         guard current.expiresSoon() else { return current }
-
-        var refreshed = try await refresh(refreshToken: refreshToken)
-        // Auth0 may omit a new refresh token; keep the existing one.
-        if refreshed.refreshToken == nil { refreshed.refreshToken = refreshToken }
-        TokenStore.save(refreshed)
-        return refreshed
+        return await TokenRefresher.refresh()
     }
 
     // MARK: - Authorize URL
@@ -122,7 +117,7 @@ final class AuthService: NSObject {
         }
     }
 
-    // MARK: - Token endpoints
+    // MARK: - Token endpoint
 
     private func exchangeCode(_ code: String, verifier: String) async throws
         -> Credentials
@@ -135,52 +130,11 @@ final class AuthService: NSObject {
             "code_verifier": verifier,
         ]
         if !config.audience.isEmpty { params["audience"] = config.audience }
-        return try await postToken(params)
-    }
-
-    private func refresh(refreshToken: String) async throws -> Credentials {
-        var params = [
-            "grant_type": "refresh_token",
-            "client_id": config.clientId,
-            "refresh_token": refreshToken,
-        ]
-        if !config.audience.isEmpty { params["audience"] = config.audience }
-        return try await postToken(params)
-    }
-
-    private func postToken(_ params: [String: String]) async throws -> Credentials
-    {
-        var request = URLRequest(url: config.tokenURL)
-        request.httpMethod = "POST"
-        request.setValue(
-            "application/x-www-form-urlencoded",
-            forHTTPHeaderField: "Content-Type")
-        request.httpBody =
-            params
-            .map { key, value in
-                let encoded =
-                    value.addingPercentEncoding(
-                        withAllowedCharacters: .urlQueryValueAllowed) ?? value
-                return "\(key)=\(encoded)"
-            }
-            .joined(separator: "&")
-            .data(using: .utf8)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard
-            let http = response as? HTTPURLResponse,
-            (200..<300).contains(http.statusCode),
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let accessToken = json["access_token"] as? String
-        else { throw AuthError.tokenExchangeFailed }
-
-        let expiresAt = (json["expires_in"] as? Double)
-            .map { Date().addingTimeInterval($0) }
-        return Credentials(
-            accessToken: accessToken,
-            refreshToken: json["refresh_token"] as? String,
-            expiresAt: expiresAt
-        )
+        do {
+            return try await Auth0TokenEndpoint.post(params, config: config)
+        } catch {
+            throw AuthError.tokenExchangeFailed
+        }
     }
 }
 
@@ -192,14 +146,4 @@ extension AuthService: ASWebAuthenticationPresentationContextProviding {
             .first { $0.activationState == .foregroundActive } as? UIWindowScene
         return scene?.keyWindow ?? ASPresentationAnchor()
     }
-}
-
-extension CharacterSet {
-    /// Unreserved characters for `application/x-www-form-urlencoded` values —
-    /// everything else (incl. `+ / =`) is percent-encoded.
-    fileprivate static let urlQueryValueAllowed: CharacterSet = {
-        var set = CharacterSet.alphanumerics
-        set.insert(charactersIn: "-._~")
-        return set
-    }()
 }

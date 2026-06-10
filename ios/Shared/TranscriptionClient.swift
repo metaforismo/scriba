@@ -22,8 +22,6 @@ enum TranscriptionError: LocalizedError {
 /// gRPC stream (tight memory/lifecycle limits), so this records a short clip and
 /// POSTs it as base64.
 struct TranscriptionClient {
-    var token: String? = TokenStore.accessToken
-
     /// - Parameters:
     ///   - audio: WAV (16 kHz, mono, 16-bit PCM) audio data.
     ///   - cleanupLevel: forwarded as the `transcript-cleanup-level` header.
@@ -32,7 +30,21 @@ struct TranscriptionClient {
         fileType: String = "wav",
         cleanupLevel: CleanupLevel = .current
     ) async throws -> String {
-        guard let token, !token.isEmpty else { throw TranscriptionError.notSignedIn }
+        try await transcribe(
+            audio: audio, fileType: fileType, cleanupLevel: cleanupLevel,
+            allowRefresh: true)
+    }
+
+    private func transcribe(
+        audio: Data,
+        fileType: String,
+        cleanupLevel: CleanupLevel,
+        allowRefresh: Bool
+    ) async throws -> String {
+        // Read the token fresh each attempt so a refresh-then-retry uses the new one.
+        guard let token = TokenStore.accessToken, !token.isEmpty else {
+            throw TranscriptionError.notSignedIn
+        }
 
         var request = URLRequest(url: BackendConfig.transcribeURL)
         request.httpMethod = "POST"
@@ -67,6 +79,12 @@ struct TranscriptionClient {
             if let transcript = json?["transcript"] as? String { return transcript }
             throw TranscriptionError.server(code: nil)
         case 401:
+            // Token likely expired — refresh once and retry before giving up.
+            if allowRefresh, await TokenRefresher.refresh() != nil {
+                return try await transcribe(
+                    audio: audio, fileType: fileType, cleanupLevel: cleanupLevel,
+                    allowRefresh: false)
+            }
             throw TranscriptionError.notSignedIn
         case 422 where (json?["code"] as? String) == "CLIENT_NO_SPEECH_DETECTED":
             throw TranscriptionError.noSpeech

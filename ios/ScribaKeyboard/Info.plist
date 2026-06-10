@@ -8,6 +8,14 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Auth0 config (same build settings as the app) so the keyboard can refresh
+	     an expired access token on a 401 without forcing the user back into the app. -->
+	<key>AUTH0_DOMAIN</key>
+	<string>$(AUTH0_DOMAIN)</string>
+	<key>AUTH0_CLIENT_ID</key>
+	<string>$(AUTH0_CLIENT_ID)</string>
+	<key>AUTH0_AUDIENCE</key>
+	<string>$(AUTH0_AUDIENCE)</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>
