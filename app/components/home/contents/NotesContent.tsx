@@ -47,9 +47,13 @@ export default function NotesContent() {
   const editTextareaRef = useRef<HTMLTextAreaElement>(null)
   const platform = usePlatform()
 
+  // Load notes once on mount. `loadNotes` is a stable store action, so this does
+  // not re-run. Previously `notes.length`/`addNote` were deps, which re-fetched
+  // the whole list (an extra IPC round-trip + flash) on every add/delete — the
+  // store already updates `notes` optimistically.
   useEffect(() => {
     loadNotes()
-  }, [loadNotes, addNote, notes.length])
+  }, [loadNotes])
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
