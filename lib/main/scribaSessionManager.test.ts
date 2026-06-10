@@ -296,6 +296,37 @@ describe('scribaSessionManager', () => {
     ).toHaveBeenCalledWith(ScribaMode.EDIT)
   })
 
+  test('re-fetches context when switching into EDIT mode mid-session', async () => {
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await new Promise(resolve => setTimeout(resolve, 50)) // let the initial fetch settle
+    mockContextGrabber.gatherContext.mockClear()
+    mockScribaStreamController.scheduleConfigUpdate.mockClear()
+
+    session.setMode(ScribaMode.EDIT)
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // EDIT needs the selected text, so the context (and selection) is re-grabbed.
+    expect(mockContextGrabber.gatherContext).toHaveBeenCalled()
+    expect(mockScribaStreamController.scheduleConfigUpdate).toHaveBeenCalled()
+  })
+
+  test('does not re-fetch context when switching to TRANSCRIBE', async () => {
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await new Promise(resolve => setTimeout(resolve, 50))
+    mockContextGrabber.gatherContext.mockClear()
+
+    session.setMode(ScribaMode.TRANSCRIBE)
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    expect(mockContextGrabber.gatherContext).not.toHaveBeenCalled()
+  })
+
   test('should cancel session successfully', async () => {
     const { ScribaSessionManager } = await import('./scribaSessionManager')
     const session = new ScribaSessionManager()

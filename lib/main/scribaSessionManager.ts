@@ -144,6 +144,18 @@ export class ScribaSessionManager {
 
     // Update UI to show the new mode
     recordingStateNotifier.notifyRecordingStarted(mode)
+
+    // EDIT mode rewrites the user's selected text. Context (incl. the selection)
+    // was only gathered at startSession in TRANSCRIBE mode, so a mid-session
+    // switch into EDIT would run the LLM with stale/empty context. Re-fetch it.
+    if (mode === ScribaMode.EDIT) {
+      this.fetchAndSendContext().catch(error => {
+        log.error(
+          '[scribaSessionManager] Failed to refresh context on mode change:',
+          error,
+        )
+      })
+    }
   }
 
   public async cancelSession() {
