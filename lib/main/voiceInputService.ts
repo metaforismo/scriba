@@ -7,6 +7,12 @@ import { IPC_EVENTS } from '../types/ipc'
 import log from 'electron-log'
 
 export class VoiceInputService {
+  // Whether THIS session muted the system audio. We unmute based on this, not on
+  // the current setting, so toggling `muteAudioWhenDictating` off mid-dictation
+  // can't leave the system permanently muted (and toggling it on mid-dictation
+  // can't trigger an unmute we never matched with a mute).
+  private didMuteSystemAudio = false
+
   /**
    * Starts audio recording and handles system audio muting.
    * Does NOT start the ScribaStreamController - that should be done separately.
@@ -17,8 +23,9 @@ export class VoiceInputService {
     const settings = store.get(STORE_KEYS.SETTINGS)
     const deviceId = settings.microphoneDeviceId
 
-    // Mute system audio if needed
-    if (settings.muteAudioWhenDictating) {
+    // Mute system audio if needed, and remember that we did so.
+    this.didMuteSystemAudio = settings.muteAudioWhenDictating === true
+    if (this.didMuteSystemAudio) {
       console.log('[VoiceInputService] Muting system audio for dictation')
       muteSystemAudio()
     }
@@ -52,10 +59,11 @@ export class VoiceInputService {
       log.warn('[VoiceInputService] drain-complete wait failed, proceeding:', e)
     }
 
-    // Unmute system audio if it was muted
-    if (store.get(STORE_KEYS.SETTINGS).muteAudioWhenDictating) {
+    // Unmute only if we muted at the start of THIS session.
+    if (this.didMuteSystemAudio) {
       console.log('[VoiceInputService] Unmuting system audio after dictation')
       unmuteSystemAudio()
+      this.didMuteSystemAudio = false
     }
 
     console.log('[VoiceInputService] Audio recording stopped')

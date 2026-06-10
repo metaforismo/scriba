@@ -9,8 +9,6 @@ import { Note, Interaction, DictionaryItem } from './sqlite/models'
 import mainStore from './store'
 import { STORE_KEYS } from '../constants/store-keys'
 import type { AdvancedSettings } from './store'
-import { DEFAULT_ADVANCED_SETTINGS } from '../constants/generated-defaults.js'
-import { main } from 'bun'
 import { mainWindow } from './app'
 
 const LAST_SYNCED_AT_KEY = 'lastSyncedAt'

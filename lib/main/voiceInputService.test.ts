@@ -101,6 +101,9 @@ describe('VoiceInputService', () => {
       }
       return null
     })
+
+    // voiceInputService is a shared singleton; reset its mute flag between tests.
+    ;(voiceInputService as any).didMuteSystemAudio = false
   })
 
   describe('Audio Recording Lifecycle', () => {
@@ -152,10 +155,46 @@ describe('VoiceInputService', () => {
         muteAudioWhenDictating: true,
       })
 
+      // Full lifecycle: start mutes, stop unmutes.
+      voiceInputService.startAudioRecording()
       await voiceInputService.stopAudioRecording()
 
       expect(mockAudioRecorderService.stopRecording).toHaveBeenCalledTimes(1)
       expect(mockUnmuteSystemAudio).toHaveBeenCalledTimes(1)
+    })
+
+    test('unmutes on stop even if muteAudioWhenDictating is toggled off mid-dictation', async () => {
+      // Start with muting enabled -> we mute the system.
+      mockStore.get.mockReturnValue({
+        microphoneDeviceId: 'test-device',
+        muteAudioWhenDictating: true,
+      })
+      voiceInputService.startAudioRecording()
+      expect(mockMuteSystemAudio).toHaveBeenCalledTimes(1)
+
+      // User flips the setting OFF while still dictating.
+      mockStore.get.mockReturnValue({ muteAudioWhenDictating: false })
+      await voiceInputService.stopAudioRecording()
+
+      // We must still unmute (we're the ones who muted), or audio stays muted forever.
+      expect(mockUnmuteSystemAudio).toHaveBeenCalledTimes(1)
+    })
+
+    test('does not unmute on stop if we did not mute (setting toggled on mid-dictation)', async () => {
+      // Start with muting disabled -> we do NOT mute.
+      mockStore.get.mockReturnValue({
+        microphoneDeviceId: 'test-device',
+        muteAudioWhenDictating: false,
+      })
+      voiceInputService.startAudioRecording()
+      expect(mockMuteSystemAudio).not.toHaveBeenCalled()
+
+      // User flips the setting ON mid-dictation.
+      mockStore.get.mockReturnValue({ muteAudioWhenDictating: true })
+      await voiceInputService.stopAudioRecording()
+
+      // No spurious unmute — we never muted this session.
+      expect(mockUnmuteSystemAudio).not.toHaveBeenCalled()
     })
 
     test('should handle drain timeout gracefully', async () => {

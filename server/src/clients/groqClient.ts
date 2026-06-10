@@ -115,7 +115,7 @@ class GroqClient implements LlmProvider {
     const noSpeechThreshold =
       options?.noSpeechThreshold ?? DEFAULT_ADVANCED_SETTINGS.noSpeechThreshold
 
-    const file = await toFile(audioBuffer, `audio.${fileType}`)
+    // Fail fast on configuration before doing any work.
     if (!this.isAvailable) {
       throw new ClientUnavailableError(ClientProvider.GROQ)
     }
@@ -124,6 +124,10 @@ class GroqClient implements LlmProvider {
     }
 
     try {
+      // Inside the try so a toFile() failure is wrapped as a ClientApiError
+      // instead of escaping as a raw, unclassified error.
+      const file = await toFile(audioBuffer, `audio.${fileType}`)
+
       console.log(
         `Transcribing ${audioBuffer.length} bytes of audio using model ${asrModel}...`,
       )
