@@ -11,6 +11,10 @@ struct RootView: View {
             SettingsView(auth: auth)
                 .tabItem { Label("Settings", systemImage: "gearshape") }
         }
+        .task {
+            // Keep the shared access token fresh for the keyboard extension.
+            await auth.refreshIfNeeded()
+        }
     }
 }
 

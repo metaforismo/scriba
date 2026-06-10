@@ -65,13 +65,23 @@ To enable the keyboard (the app walks you through this too):
 - **App Group / Keychain:** `group.ai.scriba.shared` and the
   `<TeamPrefix>.ai.scriba.shared` keychain group must be enabled on both targets
   (already declared in the `.entitlements` files).
+- **Auth0 (sign-in):** register a **Native** application in your Auth0 tenant
+  (separate from the desktop app) and add `scriba://callback` to its *Allowed
+  Callback URLs*. Then set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_AUDIENCE`
+  (build settings / an `.xcconfig` feed the matching Info.plist keys). The flow is
+  authorization-code + PKCE via `ASWebAuthenticationSession`, mirroring the desktop
+  app; tokens are stored in the shared Keychain and refreshed on launch. If the
+  `AUTH0_*` keys are empty, the app falls back to pasting a developer token.
 
 ## Status / TODO
 
 This is a working **foundation**, not yet a shippable app. Known follow-ups:
 
-- [ ] Real **Auth0 sign-in** (`ASWebAuthenticationSession` against the server's
-      `/login` route + token refresh). Today Settings accepts a pasted dev token.
+- [x] Real **Auth0 sign-in** — authorization-code + PKCE via
+      `ASWebAuthenticationSession`, tokens in the shared Keychain, refresh on
+      launch. (Pasted dev token remains as a fallback when `AUTH0_*` is unset.)
+- [ ] Keyboard-side token **refresh** on 401 (today the keyboard surfaces "please
+      sign in" and the container app refreshes on launch).
 - [ ] **Live streaming** transcription (interim results) instead of record-then-POST.
 - [ ] App icon + launch assets, haptics, and press-and-hold-to-dictate.
 - [ ] Auto-fallback to the system keyboard for secure/number/email fields.

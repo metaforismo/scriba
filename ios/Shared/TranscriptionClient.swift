@@ -22,7 +22,7 @@ enum TranscriptionError: LocalizedError {
 /// gRPC stream (tight memory/lifecycle limits), so this records a short clip and
 /// POSTs it as base64.
 struct TranscriptionClient {
-    var token: String? = TokenStore.load()
+    var token: String? = TokenStore.accessToken
 
     /// - Parameters:
     ///   - audio: WAV (16 kHz, mono, 16-bit PCM) audio data.
