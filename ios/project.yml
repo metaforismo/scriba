@@ -1,0 +1,49 @@
+# XcodeGen spec for the Scriba iOS app.
+# Generate the Xcode project with:  cd ios && xcodegen generate
+#
+# This keeps the .xcodeproj out of version control (it's generated), so the
+# project structure is reviewable as plain YAML.
+name: Scriba
+options:
+  bundleIdPrefix: ai.scriba
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    # Set your Apple Developer Team ID (or use an .xcconfig / Xcode signing UI).
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  Scriba:
+    type: application
+    platform: iOS
+    sources:
+      - Scriba
+      - Shared
+    dependencies:
+      - target: ScribaKeyboard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.scriba.app
+        INFOPLIST_FILE: Scriba/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Scriba/Resources/Scriba.entitlements
+        GENERATE_INFOPLIST_FILE: "NO"
+
+  ScribaKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - ScribaKeyboard
+      - Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.scriba.app.keyboard
+        INFOPLIST_FILE: ScribaKeyboard/Info.plist
+        CODE_SIGN_ENTITLEMENTS: ScribaKeyboard/ScribaKeyboard.entitlements
+        GENERATE_INFOPLIST_FILE: "NO"

@@ -14,6 +14,7 @@ import { registerLoggingRoutes } from './services/logging.js'
 import { registerAuth0Routes } from './services/auth0.js'
 import { IpLinkRepository } from './db/repo.js'
 import { registerTrialRoutes } from './services/trial.js'
+import { registerMobileTranscriptionRoutes } from './services/mobileTranscription.js'
 import {
   registerBillingRoutes,
   registerBillingPublicRoutes,
@@ -189,6 +190,9 @@ export const startServer = async () => {
 
     await registerTrialRoutes(fastify, { requireAuth: REQUIRE_AUTH })
     await registerBillingRoutes(fastify, { requireAuth: REQUIRE_AUTH })
+    await registerMobileTranscriptionRoutes(fastify, {
+      requireAuth: REQUIRE_AUTH,
+    })
   })
 
   // Error handling - this handles Fastify-level errors, not RPC errors.
