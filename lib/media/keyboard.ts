@@ -174,7 +174,13 @@ function stopStuckKeyChecker() {
   }
 }
 
-async function handleKeyEventInMain(event: KeyEvent) {
+// Dispatch is synchronous: this function has no `await`, so each key event is
+// processed atomically (pressed-key set + activeShortcutId transitions can't
+// interleave). The async session calls are fire-and-forget — start/stop ordering
+// is guaranteed inside scribaSessionManager (completeSession/cancelSession wait
+// for any in-flight startSession before taking ownership), which is what prevents
+// a fast key-up from tearing down a session whose start is still mid-await.
+function handleKeyEventInMain(event: KeyEvent) {
   const { isShortcutGloballyEnabled, keyboardShortcuts } = store.get(
     STORE_KEYS.SETTINGS,
   )
@@ -187,6 +193,11 @@ async function handleKeyEventInMain(event: KeyEvent) {
       console.info('Shortcut DEACTIVATED, stopping recording...')
       scribaSessionManager.completeSession()
     }
+    // Reset the pressed-key state so re-enabling shortcuts starts from a clean
+    // slate; otherwise keys held while disabled stay "pressed" and corrupt the
+    // next exact-match check.
+    pressedKeys.clear()
+    keyPressTimestamps.clear()
     return
   }
 
@@ -196,6 +207,10 @@ async function handleKeyEventInMain(event: KeyEvent) {
   if (normalizedKey === 'fn_fast') return
 
   if (event.type === 'keydown') {
+    // Ignore OS key-repeat: a held key emits repeated keydowns, and re-running
+    // the shortcut match on each one is wasted work (the pressed-set is
+    // unchanged). Skip if we already know this key is down.
+    if (pressedKeys.has(normalizedKey)) return
     pressedKeys.add(normalizedKey)
     // Track when this key was first pressed (only if not already tracked)
     if (!keyPressTimestamps.has(normalizedKey)) {
@@ -231,7 +246,7 @@ async function handleKeyEventInMain(event: KeyEvent) {
       // Starting a new session
       activeShortcutId = currentlyHeldShortcut.id
       console.info('lib Shortcut ACTIVATED, starting recording...')
-      await scribaSessionManager.startSession(currentlyHeldShortcut.mode)
+      scribaSessionManager.startSession(currentlyHeldShortcut.mode)
     } else if (activeShortcutId !== currentlyHeldShortcut.id) {
       // Different shortcut detected while already recording - change mode
       activeShortcutId = currentlyHeldShortcut.id
@@ -439,6 +454,17 @@ const getKeysToRegister = (shortcut?: KeyboardShortcutConfig): string[] => {
 
 export const stopKeyListener = () => {
   if (KeyListenerProcess) {
+    // If a dictation is in flight, the listener is going away (heartbeat-timeout
+    // restart, or quit) so the key-up that would stop it will never arrive.
+    // Cancel the orphaned session instead of leaving the recording stuck on.
+    if (activeShortcutId !== null) {
+      console.warn(
+        '[Key listener] Stopping with an active session; cancelling it to avoid an orphaned recording.',
+      )
+      activeShortcutId = null
+      scribaSessionManager.cancelSession()
+    }
+
     // Clear the set on stop to prevent stuck keys if the app restarts.
     pressedKeys.clear()
     keyPressTimestamps.clear()

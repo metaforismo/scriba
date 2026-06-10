@@ -125,6 +125,11 @@ mock.module('electron-log', () => ({
   },
 }))
 
+const mockClipboard = { writeText: mock() }
+mock.module('electron', () => ({
+  clipboard: mockClipboard,
+}))
+
 beforeEach(() => {
   console.log = mock()
   console.error = mock()
@@ -144,6 +149,7 @@ describe('scribaSessionManager', () => {
     Object.values(mockGrammarRulesService).forEach(mockFn => mockFn.mockClear())
     Object.values(mockTimingCollector).forEach(mockFn => mockFn.mockClear())
 
+    mockClipboard.writeText.mockClear()
     mockGetAdvancedSettings.mockClear()
 
     // Reset default behaviors
@@ -447,10 +453,11 @@ describe('scribaSessionManager', () => {
 
   test('should handle transcription error from server', async () => {
     const errorMessage = 'ASR service unavailable'
+    const errorCode = 'CLIENT_API_ERROR'
     mockScribaStreamController.startGrpcStream.mockResolvedValueOnce({
       response: {
         transcript: '',
-        error: { message: errorMessage },
+        error: { message: errorMessage, code: errorCode },
       } as any,
       audioBuffer: Buffer.from('audio-data'),
       sampleRate: 16000,
@@ -463,13 +470,17 @@ describe('scribaSessionManager', () => {
     await session.completeSession()
 
     expect(mockTextInserter.insertText).not.toHaveBeenCalled()
+    // The server error code must be persisted alongside the message so failures
+    // are diagnosable later.
     expect(mockInteractionManager.createInteraction).toHaveBeenCalledWith(
       '',
       Buffer.from('audio-data'),
       16000,
       errorMessage,
+      errorCode,
     )
-    expect(mockScribaStreamController.endInteraction).toHaveBeenCalled()
+    // The user gets visible feedback for the failure.
+    expect(mockRecordingStateNotifier.notifyError).toHaveBeenCalled()
     expect(mockInteractionManager.clearCurrentInteraction).toHaveBeenCalled()
   })
 
@@ -545,5 +556,81 @@ describe('scribaSessionManager', () => {
     expect(mockScribaStreamController.endInteraction).toHaveBeenCalled()
     expect(mockTextInserter.insertText).toHaveBeenCalledWith(mockTranscript)
     expect(mockRecordingStateNotifier.notifyRecordingStopped).toHaveBeenCalled()
+  })
+
+  test('falls back to the clipboard when text insertion fails', async () => {
+    const mockTranscript = 'recover me'
+    mockScribaStreamController.startGrpcStream.mockResolvedValueOnce({
+      response: { transcript: mockTranscript },
+      audioBuffer: Buffer.from('audio-data'),
+      sampleRate: 16000,
+    })
+    // Insertion fails (paste blocked, secure field, focus lost, …).
+    mockTextInserter.insertText.mockResolvedValueOnce(false)
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await session.completeSession()
+
+    // The dictation is not lost: it's copied to the clipboard and the user is told.
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(mockTranscript)
+    expect(mockRecordingStateNotifier.notifyError).toHaveBeenCalledWith(
+      'Insert failed — copied to clipboard',
+    )
+    // The interaction is still recorded.
+    expect(mockInteractionManager.createInteraction).toHaveBeenCalled()
+  })
+
+  test('completeSession waits for an in-flight start before tearing down', async () => {
+    // Hold the start in its async setup window (suspended on initialize) so the
+    // key-up arrives before `streamResponsePromise` has been assigned.
+    let releaseInit: (started: boolean) => void = () => {}
+    mockScribaStreamController.initialize.mockReturnValueOnce(
+      new Promise<boolean>(resolve => {
+        releaseInit = resolve
+      }),
+    )
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    // Start (not awaited) then immediately stop — the tearing scenario.
+    const starting = session.startSession(ScribaMode.TRANSCRIBE)
+    const completing = session.completeSession()
+
+    // Now let the start finish.
+    releaseInit(true)
+    await Promise.all([starting, completing])
+
+    // completeSession must have waited and observed the response promise the
+    // start assigned, so it actually tore the session down (no orphaned recording).
+    expect(mockScribaStreamController.endInteraction).toHaveBeenCalledTimes(1)
+    expect(mockTextInserter.insertText).toHaveBeenCalled()
+    expect(mockRecordingStateNotifier.notifyRecordingStopped).toHaveBeenCalled()
+  })
+
+  test('cancelSession waits for an in-flight start before tearing down', async () => {
+    let releaseInit: (started: boolean) => void = () => {}
+    mockScribaStreamController.initialize.mockReturnValueOnce(
+      new Promise<boolean>(resolve => {
+        releaseInit = resolve
+      }),
+    )
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    const starting = session.startSession(ScribaMode.TRANSCRIBE)
+    const cancelling = session.cancelSession()
+
+    releaseInit(true)
+    await Promise.all([starting, cancelling])
+
+    // The cancel observed the in-flight session and aborted it rather than
+    // no-opping and leaving the recording running.
+    expect(mockScribaStreamController.cancelTranscription).toHaveBeenCalledTimes(1)
+    expect(mockVoiceInputService.stopAudioRecording).toHaveBeenCalled()
   })
 })

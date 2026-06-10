@@ -1,4 +1,5 @@
 import { ScribaMode } from '@/app/generated/scriba_pb'
+import { clipboard } from 'electron'
 import { voiceInputService } from './voiceInputService'
 import { recordingStateNotifier } from './recordingStateNotifier'
 import { scribaStreamController } from './scribaStreamController'
@@ -20,6 +21,10 @@ export class ScribaSessionManager {
   }> | null = null
   private grammarRulesService = new GrammarRulesService('')
   private isStarting = false
+  // Resolves when an in-flight startSession finishes its setup. cancel/complete
+  // await this so a fast key-up can't tear down a session whose start hasn't yet
+  // assigned `streamResponsePromise` (which would otherwise orphan the recording).
+  private startPromise: Promise<void> | null = null
 
   public async startSession(mode: ScribaMode) {
     // Re-entrancy guard: ignore overlapping start requests (a rapid hotkey
@@ -35,6 +40,12 @@ export class ScribaSessionManager {
       return
     }
     this.isStarting = true
+    // Expose the in-flight start so a concurrent stop can wait for it. Assigned
+    // synchronously (before the first await) so the very next event sees it.
+    let releaseStart: () => void = () => {}
+    this.startPromise = new Promise<void>(resolve => {
+      releaseStart = resolve
+    })
     try {
       console.log('[scribaSessionManager] Starting session with mode:', mode)
 
@@ -89,6 +100,19 @@ export class ScribaSessionManager {
       return interactionId
     } finally {
       this.isStarting = false
+      this.startPromise = null
+      releaseStart()
+    }
+  }
+
+  /**
+   * If a startSession is mid-flight, wait for it to finish so we observe its
+   * `streamResponsePromise` before taking ownership of teardown. No-op when no
+   * start is in progress (the common case), so it adds nothing to the hot path.
+   */
+  private async waitForStartToSettle() {
+    if (this.startPromise) {
+      await this.startPromise
     }
   }
 
@@ -123,6 +147,10 @@ export class ScribaSessionManager {
   }
 
   public async cancelSession() {
+    // Let any in-flight start finish first, so we don't capture a null
+    // streamResponsePromise and silently leave the recording running.
+    await this.waitForStartToSettle()
+
     // Capture the promise in a local variable immediately so new sessions can start
     const responsePromise = this.streamResponsePromise
     this.streamResponsePromise = null
@@ -163,6 +191,10 @@ export class ScribaSessionManager {
   }
 
   public async completeSession() {
+    // Let any in-flight start finish first, so we observe the streamResponsePromise
+    // it assigns instead of capturing null and dropping the dictation.
+    await this.waitForStartToSettle()
+
     // Capture the promise in a local variable immediately so new sessions can start
     const responsePromise = this.streamResponsePromise
     this.streamResponsePromise = null
@@ -268,6 +300,7 @@ export class ScribaSessionManager {
         audioBuffer,
         sampleRate,
         errorMessage,
+        response.error.code,
       )
       timingCollector.clearInteraction()
       interactionManager.clearCurrentInteraction()
@@ -284,7 +317,23 @@ export class ScribaSessionManager {
             this.grammarRulesService.addLeadingSpaceIfNeeded(textToInsert)
         }
 
-        this.textInserter.insertText(textToInsert)
+        // Await the insertion so an insert failure doesn't silently drop the
+        // dictation. If it fails (paste blocked, secure field, focus lost), fall
+        // back to the clipboard so the user can still recover the text instead of
+        // losing the whole recording — Wispr's graceful-degradation pattern.
+        const inserted = await this.textInserter.insertText(textToInsert)
+        if (!inserted) {
+          try {
+            clipboard.writeText(textToInsert)
+            recordingStateNotifier.notifyError('Insert failed — copied to clipboard')
+          } catch (clipboardError) {
+            log.error(
+              '[scribaSessionManager] Clipboard fallback failed:',
+              clipboardError,
+            )
+            recordingStateNotifier.notifyError('Insert failed')
+          }
+        }
 
         // Create interaction in database
         await interactionManager.createInteraction(

@@ -1197,6 +1197,61 @@ describe('Keyboard Module', () => {
   })
 
   describe('Memory Management Business Logic', () => {
+    test('should cancel an in-flight session when the listener is stopped', async () => {
+      mockMainStore.get.mockReturnValue({
+        isShortcutGloballyEnabled: true,
+        keyboardShortcuts: [
+          {
+            id: 'orphan-test',
+            keys: ['command', 'space'],
+            mode: ScribaMode.TRANSCRIBE,
+          },
+        ],
+      })
+
+      const { startKeyListener, stopKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // Activate a shortcut (session now in progress).
+      const commandDown = {
+        type: 'keydown',
+        key: 'MetaLeft',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        raw_code: 91,
+      }
+      const spaceDown = {
+        type: 'keydown',
+        key: 'Space',
+        timestamp: '2024-01-01T00:00:00.001Z',
+        raw_code: 32,
+      }
+      mockChildProcess.stdout.emit(
+        'data',
+        Buffer.from(JSON.stringify(commandDown) + '\n'),
+      )
+      mockChildProcess.stdout.emit(
+        'data',
+        Buffer.from(JSON.stringify(spaceDown) + '\n'),
+      )
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalled()
+
+      // The listener dies (heartbeat-timeout restart / quit): the key-up that
+      // would stop the recording will never arrive, so the session must be cancelled.
+      stopKeyListener()
+
+      expect(mockScribaSessionManager.cancelSession).toHaveBeenCalledTimes(1)
+    })
+
+    test('should not cancel a session on stop when none is active', async () => {
+      const { startKeyListener, stopKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // No shortcut activated.
+      stopKeyListener()
+
+      expect(mockScribaSessionManager.cancelSession).not.toHaveBeenCalled()
+    })
+
     test('should clear pressed keys state on stop', async () => {
       const { startKeyListener, stopKeyListener } = await import('./keyboard')
 
