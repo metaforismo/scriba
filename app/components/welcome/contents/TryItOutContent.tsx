@@ -18,7 +18,8 @@ export default function TryItOut() {
   const { decrementOnboardingStep, setOnboardingCompleted } =
     useOnboardingStore()
   const { getScribaModeShortcuts } = useSettingsStore()
-  const keyboardShortcut = getScribaModeShortcuts(ScribaMode.TRANSCRIBE)[0].keys
+  const keyboardShortcut =
+    getScribaModeShortcuts(ScribaMode.TRANSCRIBE)[0]?.keys ?? []
   const platform = usePlatform()
   const [selectedApp, setSelectedApp] = useState<
     'slack' | 'gmail' | 'cursor' | 'chatgpt' | 'notion'

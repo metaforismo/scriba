@@ -21,7 +21,8 @@ import { usePlatform } from '@/app/hooks/usePlatform'
 export default function NotesContent() {
   const { notes, loadNotes, addNote, deleteNote, updateNote } = useNotesStore()
   const { getScribaModeShortcuts } = useSettingsStore()
-  const keyboardShortcut = getScribaModeShortcuts(ScribaMode.TRANSCRIBE)[0].keys
+  const keyboardShortcut =
+    getScribaModeShortcuts(ScribaMode.TRANSCRIBE)[0]?.keys ?? []
   const [creatingNote, setCreatingNote] = useState(false)
   const [showAddNoteButton, setShowAddNoteButton] = useState(false)
   const [noteContent, setNoteContent] = useState('')

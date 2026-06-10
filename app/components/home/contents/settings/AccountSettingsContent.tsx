@@ -85,7 +85,7 @@ export default function AccountSettingsContent() {
           <label className="text-sm font-medium text-gray-900">Name</label>
           <input
             type="text"
-            value={user?.name}
+            value={user?.name ?? ''}
             onChange={e => setName(e.target.value)}
             className="w-80 bg-white border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />

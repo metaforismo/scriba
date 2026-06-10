@@ -72,7 +72,8 @@ export default function HomeContent({
   isStartingTrial = false,
 }: HomeContentProps) {
   const { getScribaModeShortcuts } = useSettingsStore()
-  const keyboardShortcut = getScribaModeShortcuts(ScribaMode.TRANSCRIBE)[0].keys
+  const keyboardShortcut =
+    getScribaModeShortcuts(ScribaMode.TRANSCRIBE)[0]?.keys ?? []
   const { user } = useAuthStore()
   const firstName = user?.name?.split(' ')[0]
   const platform = usePlatform()
