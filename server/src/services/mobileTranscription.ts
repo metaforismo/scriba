@@ -3,6 +3,7 @@ import { getAsrProvider } from '../clients/providerUtils.js'
 import { DEFAULT_ADVANCED_SETTINGS } from '../constants/generated-defaults.js'
 import { HeaderValidator } from '../validation/HeaderValidator.js'
 import { ClientError } from '../clients/errors.js'
+import { cleanupTranscript } from './scriba/transcriptCleanup.js'
 
 interface TranscribeBody {
   audio?: string // base64-encoded audio bytes
@@ -55,7 +56,7 @@ export const registerMobileTranscriptionRoutes = async (
 
     try {
       const asrProvider = getAsrProvider(DEFAULT_ADVANCED_SETTINGS.asrProvider)
-      const transcript = await asrProvider.transcribeAudio(audioBuffer, {
+      const rawTranscript = await asrProvider.transcribeAudio(audioBuffer, {
         fileType: body.fileType || 'wav',
         asrModel: DEFAULT_ADVANCED_SETTINGS.asrModel,
         noSpeechThreshold: DEFAULT_ADVANCED_SETTINGS.noSpeechThreshold,
@@ -63,6 +64,19 @@ export const registerMobileTranscriptionRoutes = async (
           body.vocabulary ?? [],
         ),
       })
+
+      // Apply the same verbatim/light/heavy cleanup as the desktop streaming
+      // path, driven by the header the iOS keyboard already sends. Best-effort:
+      // returns the raw transcript on verbatim / empty / LLM error.
+      const cleanupLevel = HeaderValidator.validateCleanupLevel(
+        request.headers['transcript-cleanup-level'] as string | undefined,
+      )
+      const transcript = await cleanupTranscript(rawTranscript, cleanupLevel, {
+        llmProvider: DEFAULT_ADVANCED_SETTINGS.llmProvider,
+        llmModel: DEFAULT_ADVANCED_SETTINGS.llmModel,
+        llmTemperature: DEFAULT_ADVANCED_SETTINGS.llmTemperature,
+      })
+
       reply.send({ transcript })
     } catch (error: any) {
       // Surface a stable error code for known client errors (e.g. no speech,

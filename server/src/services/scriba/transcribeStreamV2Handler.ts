@@ -23,11 +23,8 @@ import {
   NoSpeechThresholdSchema,
   type TranscriptCleanupLevel,
 } from '../../validation/schemas.js'
-import {
-  SCRIBA_MODE_SYSTEM_PROMPT,
-  TRANSCRIPT_CLEANUP_PROMPT,
-  TRANSCRIPT_CLEANUP_SYSTEM_PROMPT,
-} from './constants.js'
+import { SCRIBA_MODE_SYSTEM_PROMPT } from './constants.js'
+import { cleanupTranscript } from './transcriptCleanup.js'
 import type { ScribaContext } from './types.js'
 import { isAbortError, createAbortError } from '../../utils/abortUtils.js'
 import {
@@ -169,7 +166,7 @@ export class TranscribeStreamV2Handler {
       if (mode === ScribaMode.TRANSCRIBE && cleanupLevel !== 'verbatim') {
         transcript = await serverTimingCollector.timeAsync(
           ServerTimingEventName.LLM_ADJUSTMENT,
-          () => this.cleanupTranscript(transcript, cleanupLevel, advancedSettings),
+          () => cleanupTranscript(transcript, cleanupLevel, advancedSettings),
           interactionId,
         )
       }
@@ -450,49 +447,6 @@ export class TranscribeStreamV2Handler {
     )
 
     return adjustedTranscript
-  }
-
-  /**
-   * Runs the optional dictation cleanup pass (light/heavy) over a TRANSCRIBE-mode
-   * transcript. Best-effort: on an empty transcript, an LLM error, or empty LLM
-   * output it returns the raw transcript so cleanup can never lose or blank a
-   * dictation.
-   */
-  private async cleanupTranscript(
-    transcript: string,
-    level: Exclude<TranscriptCleanupLevel, 'verbatim'>,
-    advancedSettings: ReturnType<typeof this.prepareAdvancedSettings>,
-  ): Promise<string> {
-    if (!transcript.trim()) {
-      return transcript
-    }
-
-    const instruction = TRANSCRIPT_CLEANUP_PROMPT[level]
-    const llmProvider = getLlmProvider(advancedSettings.llmProvider)
-
-    try {
-      const cleaned = await llmProvider.adjustTranscript(
-        `${instruction}\n\nTranscript:\n${transcript}`,
-        {
-          temperature: advancedSettings.llmTemperature,
-          model: advancedSettings.llmModel,
-          prompt: TRANSCRIPT_CLEANUP_SYSTEM_PROMPT,
-        },
-      )
-
-      console.log(
-        `🧹 [${new Date().toISOString()}] Cleaned transcript (${level}): "${cleaned}"`,
-      )
-
-      // Never replace a real dictation with empty output.
-      return cleaned && cleaned.trim() ? cleaned : transcript
-    } catch (error) {
-      console.error(
-        `[${new Date().toISOString()}] Transcript cleanup (${level}) failed, using raw transcript:`,
-        error,
-      )
-      return transcript
-    }
   }
 
   private mergeStreamConfigs(

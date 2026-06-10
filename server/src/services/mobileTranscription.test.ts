@@ -2,13 +2,14 @@ import { describe, it, expect, mock, beforeEach } from 'bun:test'
 import { createTestApp, createTestAppWithAuth } from './__tests__/helpers.js'
 
 const mockTranscribeAudio = mock(() => Promise.resolve('hello world'))
+const mockAdjustTranscript = mock(() => Promise.resolve('Hello, world.'))
 
 mock.module('../clients/providerUtils.js', () => ({
   getAsrProvider: () => ({
     isAvailable: true,
     transcribeAudio: mockTranscribeAudio,
   }),
-  getLlmProvider: () => ({}),
+  getLlmProvider: () => ({ adjustTranscript: mockAdjustTranscript }),
 }))
 
 const { registerMobileTranscriptionRoutes } = await import(
@@ -23,9 +24,11 @@ describe('registerMobileTranscriptionRoutes', () => {
   beforeEach(() => {
     mockTranscribeAudio.mockClear()
     mockTranscribeAudio.mockResolvedValue('hello world')
+    mockAdjustTranscript.mockClear()
+    mockAdjustTranscript.mockResolvedValue('Hello, world.')
   })
 
-  it('returns the transcript for valid audio', async () => {
+  it('returns the transcript for valid audio (verbatim by default, no LLM)', async () => {
     const app = createTestAppWithAuth()
     await registerMobileTranscriptionRoutes(app, { requireAuth: true })
 
@@ -38,6 +41,24 @@ describe('registerMobileTranscriptionRoutes', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ transcript: 'hello world' })
     expect(mockTranscribeAudio).toHaveBeenCalledTimes(1)
+    // No cleanup header -> verbatim -> the LLM is not invoked.
+    expect(mockAdjustTranscript).not.toHaveBeenCalled()
+  })
+
+  it('applies cleanup when the transcript-cleanup-level header is set', async () => {
+    const app = createTestAppWithAuth()
+    await registerMobileTranscriptionRoutes(app, { requireAuth: true })
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/transcribe',
+      headers: { 'transcript-cleanup-level': 'light' },
+      payload: { audio: b64('fake-wav-bytes'), fileType: 'wav' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ transcript: 'Hello, world.' })
+    expect(mockAdjustTranscript).toHaveBeenCalledTimes(1)
   })
 
   it('401s when auth is required but there is no user', async () => {
