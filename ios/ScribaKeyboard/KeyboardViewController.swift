@@ -6,6 +6,7 @@ import UIKit
 /// the extension can reach the network and the microphone.
 final class KeyboardViewController: UIInputViewController {
     private let dictation = DictationController()
+    private let context = KeyboardContext()
     private var hostingController: UIHostingController<KeyboardView>?
 
     override func viewDidLoad() {
@@ -19,6 +20,7 @@ final class KeyboardViewController: UIInputViewController {
         let keyboard = KeyboardView(
             dictation: dictation,
             recorder: dictation.recorder,
+            context: context,
             needsInputModeSwitch: needsInputModeSwitchKey,
             onAdvanceKeyboard: { [weak self] in self?.advanceToNextInputMode() },
             onDelete: { [weak self] in self?.textDocumentProxy.deleteBackward() },
@@ -39,5 +41,19 @@ final class KeyboardViewController: UIInputViewController {
             host.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
         ])
         hostingController = host
+
+        context.update(from: textDocumentProxy)
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        context.update(from: textDocumentProxy)
+    }
+
+    override func textDidChange(_ textInput: UITextInput?) {
+        super.textDidChange(textInput)
+        // The host field (and its keyboard type / secure flag) can change as the
+        // user moves between inputs — keep the fallback prompt in sync.
+        context.update(from: textDocumentProxy)
     }
 }
