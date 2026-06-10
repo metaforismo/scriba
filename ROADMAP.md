@@ -95,6 +95,14 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 22 — 2026-06-11
+- **Fix (server):** in wake-phrase-triggered EDIT mode, the full transcript ("hey scriba, make this formal") was fed to the command LLM, so the wake word polluted the instruction. New `stripScribaWakePhrase()` (no-op when absent, e.g. hotkey-triggered EDIT) applied in both V2 and V1 EDIT paths → the LLM gets just the command. +3 tests; helpers suite green.
+- **Findings worth recording:**
+  - **Live streaming is blocked on a streaming ASR provider** — Groq Whisper is batch-only, so the Wispr "live" feel needs a streaming provider (e.g. Deepgram/AssemblyAI, or the Riva path the fork dropped). That's a cost/infra **product decision** for the user, not a code fix.
+  - **Native Rust can't be compiled here** — the `native/` workspace requires Cargo `edition2024` (beyond cargo 1.83 in this env), so the macOS text-writer clipboard-clobber + 1s-blocking-restore bugs can't be safely fixed correct-by-inspection (unsafe Cocoa interop). Flagged for a real-build environment.
+  - **Server test flakiness:** `billing.test.ts` (~56s) and `validationInterceptor` protovalidate are slow and intermittently exceed bun's 5s per-test timeout under CPU load (e.g. concurrent runs) — pre-existing, not regressions. Run server test files one-at-a-time / unloaded.
+- **Next:** product-decision items (streaming ASR provider; snippets/text-expansion; double-tap hands-free as an opt-in setting) likely need user input; otherwise continue small testable fixes.
+
 ### Iteration 21 — 2026-06-10
 - **Fix (P1, desktop):** context (window, app, and the **selected text**) was only gathered once at `startSession` in TRANSCRIBE mode, so switching into EDIT mid-session (a different hotkey) ran the LLM rewrite with stale/empty context — EDIT couldn't see the selection. `setMode` now re-fetches context when switching into EDIT. +2 tests; full lib suite green.
 - **(Considered + rejected this round:** double-tap hands-free — it changes the core push-to-talk behavior (a sub-threshold tap would become hands-free) and breaks the synchronous-timing tests; too risky without real-app testing.)
