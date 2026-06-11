@@ -96,6 +96,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 53 — 2026-06-11 (desktop CJK spacing — same bug as iOS)
+- **Fix (desktop, multilingual):** the iOS CJK find (iter 52) applied to desktop too — `GrammarRulesService.needsLeadingSpace` defaulted to `return true` for any non-whitespace/non-opening-punct char, so CJK text got a wrong leading space when grammar service is enabled. Added the same CJK check (ideographs, kana, Hangul); accented Latin etc. unaffected. +2 tests; grammar suite green. Direct to main.
+- **Next:** more research-driven/testable work.
+
 ### Iteration 52 — 2026-06-11 (iOS CJK spacing bug) — PR #20
 - **Fix (iOS, multilingual bug):** the smart-spacing helper used `Character.isLetter`, which is **true for CJK** — so dictating after Chinese/Japanese/Korean text wrongly inserted a space (`你好`+`世界` → `你好 世界`). Since Scriba ships zh/ja/ko in the language picker, this hit real users. Now skips the space when the preceding char is CJK (ideographs, kana, Hangul); space-using scripts incl. accented Latin are unaffected. +2 tests; 28 iOS tests pass. PR #20 → merged.
 - **Also confirmed resolved:** the Whisper-prompt 224-token overflow (backlog) — `transcription.ts` already does term-aware truncation **and logs** what it drops (not silent).
