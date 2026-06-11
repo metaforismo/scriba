@@ -96,6 +96,13 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 41 — 2026-06-11 (runtime UI verification + empty-section fix) — PR #14
+- **Runtime-verified my earlier work** by driving the app in the sim (snapshot_ui/tap/screenshot): Settings renders the cleanup segmented control (Verbatim/Light/Heavy) and the Language picker; tapping Language opens the menu with **all 17 languages**, Auto-detect selected. iters 29-31 (language) + cleanup UI confirmed working end-to-end.
+- **Fix (iOS UX):** the **ACCOUNT** settings section rendered **empty** (just a header) when not signed in and Auth0 isn't configured. Added a guiding line ("Sign-in isn't configured. Use a developer token below."). Build + runtime verified. PR #14 → merged.
+- **Observation (config, not changed):** the backend defaults to `localhost:3000` (dev). For a shippable build the user must set the production server URL (Settings has a "Save URL" field, and `BackendConfig` reads it). Flagged for the user.
+- **UI automation note:** `session_set_defaults { simulatorId }` then `snapshot_ui`/`tap`/`screenshot` works for runtime UI checks.
+- **Next:** more runtime-verified iOS polish or testable desktop/server work.
+
 ### Iteration 40 — 2026-06-11 (iOS app now actually runs 🎉 — critical bundle-ID fix) — PR #13
 - **Critical fix (iOS):** both `Info.plist` files were **missing `CFBundleIdentifier`** — with `GENERATE_INFOPLIST_FILE=NO`, Xcode doesn't inject it, so the built `.app`/`.appex` had **no bundle ID and could not be installed or launched** ("Missing bundle ID"). The app compiled and all unit tests passed every prior iteration, but it was **not runnable** (TestFlight/device installs would have failed). Added `$(PRODUCT_BUNDLE_IDENTIFIER)` + CFBundleName/Executable/PackageType to both. PR #13 → merged.
 - **How found:** for the first time I **ran the app in the simulator** (build → `simctl install` → `launch` → screenshot), not just build/unit-test. Install failed on the missing bundle ID. After the fix: bundle IDs `ai.scriba.app` / `ai.scriba.app.keyboard`, app launches and renders the onboarding screen ("Set up Scriba — Dictate into any app with a tap"), no crash. 17 unit tests still pass.
