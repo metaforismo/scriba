@@ -22,6 +22,10 @@ final class AudioRecorder: ObservableObject {
     /// isn't silently lost (a common long-form/AirPods complaint).
     var onInterrupted: (() -> Void)?
 
+    /// Called from the audio tap with each raw input buffer, so a live transcriber
+    /// can stream it (only one tap is allowed per node, so we fan out here).
+    var onBuffer: ((AVAudioPCMBuffer) -> Void)?
+
     private let engine = AVAudioEngine()
     private let targetSampleRate: Double = 16_000
     private var converter: AVAudioConverter?
@@ -60,6 +64,7 @@ final class AudioRecorder: ObservableObject {
 
         input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat) {
             [weak self] buffer, _ in
+            self?.onBuffer?(buffer)
             self?.process(buffer: buffer, outputFormat: outputFormat)
         }
 

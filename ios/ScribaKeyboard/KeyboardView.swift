@@ -8,6 +8,7 @@ struct KeyboardView: View {
     @ObservedObject var dictation: DictationController
     @ObservedObject var recorder: AudioRecorder
     @ObservedObject var context: KeyboardContext
+    @ObservedObject var live: LiveTranscriber
 
     var needsInputModeSwitch: Bool
     var onAdvanceKeyboard: () -> Void
@@ -100,7 +101,17 @@ struct KeyboardView: View {
                 Text("Tap to dictate")
                     .foregroundColor(.white.opacity(0.6))
             case .recording:
-                Waveform(level: recorder.level)
+                // Show the live, on-device interim words as they're recognized
+                // (head-truncated so the latest words stay visible); fall back to
+                // the waveform until the first words arrive.
+                if live.interim.isEmpty {
+                    Waveform(level: recorder.level)
+                } else {
+                    Text(live.interim)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .truncationMode(.head)
+                }
             case .transcribing:
                 Label("Transcribing…", systemImage: "waveform")
                     .foregroundColor(.white.opacity(0.8))
