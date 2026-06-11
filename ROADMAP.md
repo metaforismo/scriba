@@ -64,7 +64,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 - [ ] **Command Mode**: select → hotkey → spoken instruction → replace selection / insert at cursor. translate/summarize/tone + "press enter".
 - [ ] **Dictionary learns from corrections automatically** + dev-term/code-syntax awareness.
 - [x] **Snippets / voice text-expansion.** Engine (PR #5: tested `expandSnippets` + store field + pipeline wiring) **+ management UI** (PR #6: a "Snippets" settings tab to add/remove trigger→expansion pairs, persisted on blur, kept out of analytics). Complete feature.
-- [ ] **Multilingual + auto language detect** surfaced in settings (Whisper already auto-detects; no UI).
+- [~] **Multilingual + language selection.** Server vertical done (iter 29): force a Whisper language ('auto' or ISO-639-1) via the `transcription-language` header (groqClient + V2 handler + mobile endpoint + validation). Default auto-detect. **Next: client language setting + UI** (a picker in settings).
 - [ ] **Privacy-safe app-context formatting** (on-device active-window text, loudly disclosed, toggleable).
 
 ### P3 — Mobile (new platforms)
@@ -94,6 +94,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 29 — 2026-06-11 (language selection — server vertical)
+- **Feat (server, Wispr "100+ languages"):** lets a client **force a Whisper transcription language** (better accuracy for non-English speech) instead of always auto-detecting. Header-based (`transcription-language`, no proto change, like cleanup level): `groqClient` passes `language` to the Whisper call only when set (not 'auto'); `TranscriptionLanguageSchema` + `validateLanguage` ('auto' or ISO-639-1, never throws → 'auto'); read in the V2 handler + mobile `/v1/transcribe`. Default auto-detect → no behavior change. +4 tests; server suite green.
+- **Next (language):** the **client setting + a language picker UI** (so users can choose); then the iOS client can send the header too.
 
 ### Iteration 28 — 2026-06-11
 - **Fix (P0 onboarding UX):** the permissions step could **dead-end** — clicking Allow then denying the OS prompt (or, for macOS Accessibility, where there's no yes/no) left it polling silently forever with no way forward. While polling on macOS it now shows a hint + an **"Open System Settings"** deep-link to the relevant privacy pane (`x-apple.systempreferences:…Privacy_Accessibility/Microphone`) so the user can enable Scriba manually and continue. Web type-check clean for the file.
