@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The custom keyboard surface: a large mic button to dictate (à la Wispr Flow),
 /// a live waveform, status text, and a small utility row (globe / space / delete
@@ -72,6 +73,7 @@ struct KeyboardView: View {
         ) {
             ForEach(keys, id: \.self) { key in
                 Button {
+                    keyTap()
                     if key == "⌫" { onDelete() } else { onInsert(key) }
                 } label: {
                     Text(key)
@@ -150,7 +152,10 @@ struct KeyboardView: View {
                 utilityButton(system: "globe", action: onAdvanceKeyboard)
                     .accessibilityLabel("Next keyboard")
             }
-            Button(action: onSpace) {
+            Button(action: {
+                keyTap()
+                onSpace()
+            }) {
                 Text("space")
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
@@ -166,8 +171,17 @@ struct KeyboardView: View {
         }
     }
 
+    /// Light tap feedback on each keypress, like the system keyboard (works
+    /// because the keyboard requires Full Access).
+    private func keyTap() {
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+    }
+
     private func utilityButton(system: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button(action: {
+            keyTap()
+            action()
+        }) {
             Image(systemName: system)
                 .font(.system(size: 18, weight: .medium))
                 .foregroundColor(.white)
