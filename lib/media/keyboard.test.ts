@@ -1821,5 +1821,32 @@ describe('Keyboard Module', () => {
       expect(mockScribaSessionManager.cancelSession).toHaveBeenCalledTimes(1)
       expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
     })
+
+    test('a different shortcut during the pending window is not a double-tap', async () => {
+      mockMainStore.get.mockReturnValue({
+        isShortcutGloballyEnabled: true,
+        handsFreeEnabled: true,
+        keyboardShortcuts: [
+          { id: 'hf-a', keys: ['command', 'space'], mode: ScribaMode.TRANSCRIBE },
+          { id: 'hf-b', keys: ['shift-left'], mode: ScribaMode.EDIT },
+        ],
+      })
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // Quick tap of shortcut A → pending.
+      tap()
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      // A DIFFERENT shortcut within the window must NOT be read as a double-tap
+      // of A: it completes A's pending tap and starts a fresh B session.
+      down('ShiftLeft')
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(2)
+      expect(mockScribaSessionManager.startSession).toHaveBeenLastCalledWith(
+        ScribaMode.EDIT,
+      )
+    })
   })
 })

@@ -43,6 +43,10 @@ let activationAt = 0
 // Pending single-tap: after a quick tap we defer completion briefly so a second
 // tap can upgrade it to hands-free. Fires completeSession if no second tap comes.
 let pendingTapTimer: NodeJS.Timeout | null = null
+// The shortcut id the pending tap belongs to — only the SAME shortcut tapped
+// again counts as a double-tap; a different shortcut completes the pending tap
+// and starts fresh.
+let pendingTapShortcutId: string | null = null
 // Holds at/above this are push-to-talk; shorter presses are taps.
 const HOLD_THRESHOLD_MS = 250
 // A follow-up press within this of a quick-tap release counts as a double-tap.
@@ -53,6 +57,7 @@ function clearPendingTap() {
     clearTimeout(pendingTapTimer)
     pendingTapTimer = null
   }
+  pendingTapShortcutId = null
 }
 
 // Heartbeat monitoring state
@@ -309,15 +314,22 @@ function handleKeyEventInMain(event: KeyEvent) {
           activeShortcutId = null
           return
         }
-        // A press while a quick tap is still pending = double-tap. The session
-        // from the first tap is still recording, so just keep it going
-        // hands-free instead of completing it.
         if (pendingTapTimer !== null) {
+          // A second tap of the SAME shortcut while pending = double-tap. The
+          // session from the first tap is still recording, so just keep it going
+          // hands-free instead of completing it.
+          if (currentlyHeldShortcut.id === pendingTapShortcutId) {
+            clearPendingTap()
+            handsFreeActive = true
+            activeShortcutId = currentlyHeldShortcut.id
+            console.info('lib Double-tap → HANDS-FREE, keep recording...')
+            return
+          }
+          // A DIFFERENT shortcut interrupts the pending tap — complete that brief
+          // tap, then start the new shortcut below.
           clearPendingTap()
-          handsFreeActive = true
-          activeShortcutId = currentlyHeldShortcut.id
-          console.info('lib Double-tap → HANDS-FREE, keep recording...')
-          return
+          console.info('lib Pending tap interrupted by a new shortcut...')
+          scribaSessionManager.completeSession()
         }
       }
 
@@ -345,6 +357,7 @@ function handleKeyEventInMain(event: KeyEvent) {
       }
 
       const heldMs = Date.now() - activationAt
+      const tappedShortcutId = activeShortcutId
       activeShortcutId = null
 
       // Hands-free: a quick tap (not a hold) is the first tap of a possible
@@ -352,8 +365,10 @@ function handleKeyEventInMain(event: KeyEvent) {
       // hands-free; otherwise the timer completes it. A real hold completes now.
       if (handsFreeEnabled && heldMs < HOLD_THRESHOLD_MS) {
         clearPendingTap()
+        pendingTapShortcutId = tappedShortcutId
         pendingTapTimer = setTimeout(() => {
           pendingTapTimer = null
+          pendingTapShortcutId = null
           console.info('lib Single tap, completing...')
           scribaSessionManager.completeSession()
         }, DOUBLE_TAP_WINDOW_MS)
