@@ -12,7 +12,7 @@
 
 ## Working constraints
 - Environment cannot build/run the Electron app, native Rust binaries (cargo 1.83 lacks `edition2024`), or the Bun server end-to-end. So changes must be **correct by inspection** and, where possible, covered by **unit tests** (`bun test`) updated alongside.
-- **NEW (iter 31): `xcodebuildmcp` + web-search MCP tools are now available.** Next iOS iteration should TRY actually building the keyboard target (`xcodegen generate` in `ios/`, then `mcp__xcodebuildmcp__build_sim`) to move iOS from correct-by-inspection to **compiled-verified**. TS lib/server/app suites still run via `bun runLibTests` / `runServerTests` / `runAppTests` (run files unloaded — slow tests like `billing` flake under CPU load).
+- **iOS is now BUILD- AND TEST-verified** (iters 32–34). Build: `cd ios && xcodegen generate && xcodebuild build -project Scriba.xcodeproj -scheme Scriba -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO`. **Tests** (host-less `ScribaTests` logic target): `xcodebuild test -project Scriba.xcodeproj -scheme Scriba -destination 'id=<booted-sim-udid>' CODE_SIGNING_ALLOWED=NO` (use a **booted sim's UDID** from `xcrun simctl list devices available` — the name-based destination failed). Put new pure helpers in `ios/Shared/*.swift` and add a file to `Tests/` + the `ScribaTests` sources in `project.yml`. `.xcodeproj` is gitignored. TS suites: `bun runLibTests` / `runServerTests` / `runAppTests` (run files unloaded — slow tests like `billing` flake under CPU load).
 - Prefer **small, isolated, reversible** commits over big rewrites.
 - `main` is the working branch (CLAUDE.md still says `dev` — stale).
 
@@ -95,6 +95,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 34 — 2026-06-11 (iOS smart-spacing + first iOS tests 🎉) — PR #8
+- **Feat (iOS):** **smart-spacing on insertion** — `TextInsertion.spaced()` prefixes a dictated transcript with a space when it would otherwise jam against a preceding word/sentence punctuation (à la Wispr); wired into the keyboard via `documentContextBeforeInput`.
+- **Infra milestone:** added a **host-less `ScribaTests` logic-test target** — the **first iOS unit tests**. 6 tests, `TEST SUCCEEDED` on the iPhone 16 Pro simulator. iOS pure logic is now **unit-testable**, not just compile-verified. (Destination must be a booted sim's **UDID**, not name.) PR #8 → merged.
+- **Next:** more build/test-verified iOS work (e.g. move the WAV/level helpers into testable units) or testable desktop/server items.
 
 ### Iteration 33 — 2026-06-11
 - **Feat (iOS, Wispr parity):** **haptic feedback** — a medium impact on the start/stop tap (immediate) + an error notification haptic when a dictation fails (`setError` helper). Works because the keyboard requires Full Access. **Build-verified** (xcodebuild simulator → BUILD SUCCEEDED).
