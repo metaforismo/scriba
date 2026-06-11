@@ -96,6 +96,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 44 — 2026-06-11 (iOS OAuth callback / CSRF tested) — PR #15
+- **Test (iOS, security):** extracted the OAuth redirect parsing out of `AuthService.signIn` into a pure `OAuthCallback.code(from:expectedState:)` and covered it — the `state` check is **CSRF protection** (a forged/mismatched state must be rejected). Tests: matching state→code, mismatched state, missing state, missing/empty code. **21 iOS tests total, TEST SUCCEEDED.** PR #15 → merged.
+- **Decided NOT to touch** the `useAuth.ts` `alert()` (the last native dialog): no component renders `useAuthStore.error`, so swapping `alert()`→`setError()` would make the auth-failure **invisible** (silent failure, worse). Left the visible fallback; a proper fix needs an auth-flow error surface (multi-file, risky) — deferred.
+- **iOS test coverage: smart-spacing, WAV, PKCE, form-encoding, OAuth callback (21).**
+- **Next:** more testable/runtime-verified work.
+
 ### Iteration 43 — 2026-06-11
 - **Fix (desktop UX):** replaced the native `confirm()` guarding **"Install Update"** (which restarts the app) in `Titlebar.tsx` with the app's branded **Dialog** modal ("Install update? … Install & restart"). Continues the alert/confirm cleanup from iter 42. Web type-check clean.
 - **Remaining native dialog:** `useAuth.ts` `alert()` (an auth error) — for a later pass; needs an error surface in the auth flow.
