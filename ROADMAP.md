@@ -96,6 +96,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 35 — 2026-06-11 (iOS WAV encoder → tested unit) — PR #9
+- **Refactor + tests (iOS):** extracted the WAV (RIFF) container logic out of `AudioRecorder` (AVFoundation-bound, untestable in the host-less target) into pure `Shared/WAVEncoder.swift`; `AudioRecorder.stop()` calls `WAVEncoder.encode()`. +3 tests (header layout, little-endian sample round-trip incl. Int16 extremes, empty-samples). **9 iOS tests total, TEST SUCCEEDED.** PR #9 → merged.
+- **Next:** continue extracting/test-covering iOS pure logic, or testable desktop/server items.
+
 ### Iteration 34 — 2026-06-11 (iOS smart-spacing + first iOS tests 🎉) — PR #8
 - **Feat (iOS):** **smart-spacing on insertion** — `TextInsertion.spaced()` prefixes a dictated transcript with a space when it would otherwise jam against a preceding word/sentence punctuation (à la Wispr); wired into the keyboard via `documentContextBeforeInput`.
 - **Infra milestone:** added a **host-less `ScribaTests` logic-test target** — the **first iOS unit tests**. 6 tests, `TEST SUCCEEDED` on the iPhone 16 Pro simulator. iOS pure logic is now **unit-testable**, not just compile-verified. (Destination must be a booted sim's **UDID**, not name.) PR #8 → merged.
