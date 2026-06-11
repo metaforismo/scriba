@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 42 — 2026-06-11
+- **Fix (desktop UX):** replaced native `alert()`/`confirm()` in **General settings** (log download/clear) with the app's branded **StatusIndicator** toasts + a **Dialog** confirm modal. Native dialogs block the renderer, look unbranded, and can render poorly on a frameless/transparent Electron window. Web type-check clean.
+- **Remaining native dialogs** (for a later pass): `Titlebar.tsx:156` (confirm) and `useAuth.ts` (alert) — similar treatment.
+- **Next:** more testable/runtime-verified work across the stack.
+
 ### Iteration 41 — 2026-06-11 (runtime UI verification + empty-section fix) — PR #14
 - **Runtime-verified my earlier work** by driving the app in the sim (snapshot_ui/tap/screenshot): Settings renders the cleanup segmented control (Verbatim/Light/Heavy) and the Language picker; tapping Language opens the menu with **all 17 languages**, Auto-detect selected. iters 29-31 (language) + cleanup UI confirmed working end-to-end.
 - **Fix (iOS UX):** the **ACCOUNT** settings section rendered **empty** (just a header) when not signed in and Auth0 isn't configured. Added a guiding line ("Sign-in isn't configured. Use a developer token below."). Build + runtime verified. PR #14 → merged.
