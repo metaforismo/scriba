@@ -30,7 +30,10 @@ final class KeyboardViewController: UIInputViewController {
             onAdvanceKeyboard: { [weak self] in self?.advanceToNextInputMode() },
             onDelete: { [weak self] in self?.textDocumentProxy.deleteBackward() },
             onReturn: { [weak self] in self?.textDocumentProxy.insertText("\n") },
-            onSpace: { [weak self] in self?.textDocumentProxy.insertText(" ") }
+            onSpace: { [weak self] in self?.textDocumentProxy.insertText(" ") },
+            onInsert: { [weak self] text in
+                self?.textDocumentProxy.insertText(text)
+            }
         )
 
         let host = UIHostingController(rootView: keyboard)
