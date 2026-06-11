@@ -12,9 +12,14 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // Insert the final transcript at the cursor.
+        // Insert the final transcript at the cursor, with a leading space when it
+        // would otherwise jam against the preceding word.
         dictation.onTranscript = { [weak self] transcript in
-            self?.textDocumentProxy.insertText(transcript)
+            guard let self else { return }
+            let proxy = self.textDocumentProxy
+            let text = TextInsertion.spaced(
+                transcript, after: proxy.documentContextBeforeInput)
+            proxy.insertText(text)
         }
 
         let keyboard = KeyboardView(
