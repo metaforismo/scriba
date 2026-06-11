@@ -16,6 +16,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Scriba uses the microphone to transcribe your speech into text.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Scriba uses on-device speech recognition to show your words live as you dictate.</string>
 	<!-- Auth0 config (same build settings as the app) so the keyboard can refresh
 	     an expired access token on a 401 without forcing the user back into the app. -->
 	<key>AUTH0_DOMAIN</key>

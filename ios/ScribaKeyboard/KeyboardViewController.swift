@@ -26,6 +26,7 @@ final class KeyboardViewController: UIInputViewController {
             dictation: dictation,
             recorder: dictation.recorder,
             context: context,
+            live: dictation.live,
             needsInputModeSwitch: needsInputModeSwitchKey,
             onAdvanceKeyboard: { [weak self] in self?.advanceToNextInputMode() },
             onDelete: { [weak self] in self?.textDocumentProxy.deleteBackward() },

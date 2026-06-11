@@ -16,6 +16,9 @@ final class DictationController: ObservableObject {
 
     @Published private(set) var state: State = .idle
     let recorder = AudioRecorder()
+    /// Live, on-device interim transcription for a Wispr-style streaming preview.
+    /// The accurate final transcript still comes from the server.
+    let live = LiveTranscriber()
 
     /// Called with the final transcript so the host can insert it.
     var onTranscript: ((String) -> Void)?
@@ -32,6 +35,11 @@ final class DictationController: ObservableObject {
         recorder.onInterrupted = { [weak self] in
             Task { @MainActor in self?.handleInterruption() }
         }
+        // Fan the recorder's raw audio out to the live transcriber. Capture the
+        // transcriber instance (not self) so this runs off the audio thread
+        // without touching the @MainActor controller.
+        recorder.onBuffer = { [live] buffer in live.append(buffer) }
+        LiveTranscriber.requestAuthorization()
     }
 
     private func handleInterruption() {
@@ -67,6 +75,7 @@ final class DictationController: ObservableObject {
     private func startRecording() async {
         do {
             try await recorder.start()
+            live.start() // live preview; no-op if speech permission isn't granted
             state = .recording
         } catch AudioRecorder.RecorderError.microphoneDenied {
             setError("Enable microphone access in Settings")
@@ -76,6 +85,7 @@ final class DictationController: ObservableObject {
     }
 
     private func finishRecording() async {
+        live.stop()
         let audio = recorder.stop()
         guard !audio.isEmpty else {
             state = .idle
