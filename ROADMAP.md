@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 47 — 2026-06-11 (app-aware cleanup formatting — Wispr parity)
+- **Researched** Wispr Flow afresh (firecrawl): confirmed its **context-aware formatting** — it "adapts tone and formatting for email, texting, and more" based on which app you're in.
+- **Feat (server):** Scriba already gathered the active app name but only used it for EDIT — the TRANSCRIBE **cleanup ignored it**. Now `cleanupTranscript` takes the app name (from `windowContext.appName` in the V2 handler) and, via a new pure `buildCleanupUserPrompt()`, tells the LLM to format appropriately for that medium (structured for email, concise for chat) while preserving wording/meaning/names/dates/numbers. No app context (e.g. mobile) → unchanged. +4 tests; server suite green.
+- **Next:** more testable/runtime-verified work; big items await the user (CI billing, streaming ASR provider).
+
 ### Iteration 46 — 2026-06-11 (docs accuracy + backlog audit)
 - **Fix (docs):** `CLAUDE.md` said the dev branch was `dev` (it's **`main`**) — corrected, so contributors/agents don't work on the wrong branch. Also documented `lib/`, `native/`, **`ios/`** in the structure and added an **iOS App** section (XcodeGen + the verified build/test commands, the `Shared`/`Tests` layout, backend/Auth0 config, CI workflow).
 - **Backlog audit:** confirmed the **EDIT empty-result sentinel** is already resolved (clients return `''`, not `' '` → clean skip, no false "Insert failed"); marked done. Confirmed the **V1 path can't be fully removed** (its RPC is in the generated proto and `buf` isn't available to regenerate) — only the desktop client's `transcribeStream`/`getHeadersWithMetadata` are dead (called solely by their own tests); left in place rather than a risky partial deletion.
