@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 39 — 2026-06-11 (iOS CI added + ⚠️ CI is billing-locked) — PR #12
+- **⚠️ CRITICAL FINDING (needs the user):** **GitHub Actions CI is completely non-functional — the account is billing-locked.** The CI Controller has shown `startup_failure` on *every* run for the whole session (main pushes + PRs); the real error, from the job annotation, is: **"The job was not started because your account is locked due to a billing issue."** So NO CI has run (TS tests, native, iOS) until the user resolves GitHub billing (Settings → Billing). Nothing code-side can fix this.
+- **Feat (ci):** added a standalone **`ios-build-check.yml`** (macos-latest: `brew install xcodegen` → `xcodegen generate` → `xcodebuild test` on a dynamically-selected iPhone sim, path-filtered to `ios/**`). Decoupled from the controller so it runs independently once billing is fixed. actionlint-clean; commands locally-verified (17 iOS tests pass). Also bumped deploy-server's deprecated actions (checkout@v3→v4, paths-filter@v2→v3) for hygiene. PR #12 → merged (its red CI is purely the billing lock, not the code).
+- **Note:** the other deploy workflows (app-deploy, build-image, build, infra-deploy) also use some deprecated actions (checkout@v3, configure-aws-credentials@v2, setup-node@v3) — worth bumping later, but they're outside the test-CI graph.
+
 ### Iteration 38 — 2026-06-11 (iOS auth form-encoding tested) — PR #11
 - **Refactor + tests (iOS, auth correctness):** extracted the Auth0 `application/x-www-form-urlencoded` body building out of `TokenRefresher` into a pure `Shared/FormURLEncoding.swift`; +4 tests. Refresh tokens / auth codes are base64 and routinely contain `+ / =` — if those aren't percent-encoded the refresh POST corrupts the token and silently breaks re-auth, so this pins it down. **17 iOS tests total, TEST SUCCEEDED.** PR #11 → merged.
 - **Reviewed** TokenStore (correct: shared keychain via the first access group, both entitlements list `<prefix>.ai.scriba.shared`) and TokenRefresher. **Deferred (hygiene, low realistic risk + untestable here):** coalesce concurrent `TokenRefresher.refresh()` calls (rotation-safety) — the keyboard serializes dictations so in-process races are unlikely.
