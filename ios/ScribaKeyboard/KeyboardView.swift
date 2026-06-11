@@ -13,13 +13,19 @@ struct KeyboardView: View {
     var onDelete: () -> Void
     var onReturn: () -> Void
     var onSpace: () -> Void
+    var onInsert: (String) -> Void
 
     var body: some View {
         VStack(spacing: 12) {
-            if context.fieldMode == .voice {
+            switch context.fieldMode {
+            case .voice:
                 statusLine
                 micButton
-            } else {
+            case .numeric:
+                // Built-in number pad so numeric fields don't force a keyboard
+                // switch (a common complaint about voice keyboards).
+                numberPad
+            case .secure:
                 fallbackView
             }
             utilityRow
@@ -30,21 +36,17 @@ struct KeyboardView: View {
         .background(Color(white: 0.13))
     }
 
-    // MARK: - Fallback (numeric / secure fields)
+    // MARK: - Fallback (secure fields)
 
     private var fallbackView: some View {
         VStack(spacing: 8) {
-            Image(systemName: context.fieldMode == .secure ? "lock.fill" : "number")
+            Image(systemName: "lock.fill")
                 .font(.system(size: 22))
                 .foregroundColor(.white.opacity(0.8))
-            Text(
-                context.fieldMode == .secure
-                    ? "Use the system keyboard for secure fields"
-                    : "Use the system keyboard for numbers"
-            )
-            .font(.footnote)
-            .foregroundColor(.white.opacity(0.7))
-            .multilineTextAlignment(.center)
+            Text("Use the system keyboard for secure fields")
+                .font(.footnote)
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
             Button(action: onAdvanceKeyboard) {
                 Label("Switch keyboard", systemImage: "globe")
                     .font(.footnote.weight(.medium))
@@ -57,6 +59,34 @@ struct KeyboardView: View {
             .buttonStyle(.plain)
         }
         .frame(height: 96)
+    }
+
+    // MARK: - Number pad (numeric fields)
+
+    private var numberPad: some View {
+        let keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"]
+        return LazyVGrid(
+            columns: Array(
+                repeating: GridItem(.flexible(), spacing: 8), count: 3),
+            spacing: 8
+        ) {
+            ForEach(keys, id: \.self) { key in
+                Button {
+                    if key == "⌫" { onDelete() } else { onInsert(key) }
+                } label: {
+                    Text(key)
+                        .font(.system(size: 22, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 42)
+                        .background(Color(white: 0.22))
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(key == "⌫" ? "Delete" : key)
+            }
+        }
+        .padding(.horizontal, 4)
     }
 
     // MARK: - Status
