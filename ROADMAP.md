@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 56 — 2026-06-11 (iOS key-tap haptics) — PR #23
+- **Feat (iOS polish):** light haptic on each keypress (number-pad digits, space, delete, return, globe), like a system keyboard, so typing on Scriba feels native (mic keeps its medium impact). Build-verified; 31 tests pass. PR #23 → merged.
+- **Tried + abandoned:** automating the keyboard-enable flow in the sim to view the keyboard render — the iOS Settings List rows aren't exposed as tappable refs (only text), so the ~8-step enable flow can't be reliably automated here. Keyboard stays build-verified + logic-tested.
+- **Next:** more testable/research-driven work; big items await the user.
+
 ### Iteration 55 — 2026-06-11 (iOS FieldMode classification tested) — PR #22
 - **Test (iOS):** the field classification (secure / numeric / voice) decides the whole keyboard surface (number pad vs dictation vs system-keyboard fallback) but was a private helper on the `@MainActor` `KeyboardContext`. Extracted `FieldMode` + a pure `FieldMode.from(keyboardType:isSecure:)` into its own file and tested it (secure overrides; 4 numeric keyboard types → `.numeric`; text types incl. nil → `.voice`). **31 iOS tests total, TEST SUCCEEDED.** PR #22 → merged.
 - **iOS test coverage (31):** smart-spacing (+CJK), WAV, PKCE, form-encoding, OAuth/CSRF, Credentials, FieldMode.
