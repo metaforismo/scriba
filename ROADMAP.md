@@ -96,6 +96,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 50 — 2026-06-11 (iOS explicit keyboard height) — PR #19
+- **Fix (iOS):** custom keyboards default to the system keyboard height, which can clip taller content — notably the new number pad on smaller devices. Added a high-priority (not required → no conflict with the system's layout) **280pt height constraint** that fits all field modes. Build-verified. PR #19 → merged. (Follow-up to the iter-49 number pad.)
+- **Next:** more research-driven, testable/runtime-verified work.
+
 ### Iteration 49 — 2026-06-11 (iOS number pad — beats Wispr on the #1 keyboard gripe) — PR #18
 - **Researched** Wispr iOS complaints (firecrawl/Reddit "Terrible Keyboard"): the top gripe is that **numeric/phone fields force a switch back to the system keyboard**.
 - **Feat (iOS):** Scriba now renders a **built-in number pad** (1-9, ., 0, delete) for numeric fields instead of the "switch keyboard" prompt, so users enter numbers without leaving the keyboard — a genuine win over Wispr. Secure fields still defer to the system keyboard (don't build a custom secure input). Added an `onInsert` callback; `KeyboardView` switches on `fieldMode`. Build-verified; 26 iOS tests pass. PR #18 → merged.
