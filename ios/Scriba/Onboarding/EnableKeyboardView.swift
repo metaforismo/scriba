@@ -4,7 +4,9 @@ import SwiftUI
 /// Walks the user through enabling the Scriba keyboard and granting the
 /// permissions it needs, mirroring the Wispr Flow setup flow.
 struct EnableKeyboardView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var micGranted = AVAudioApplication.shared.recordPermission == .granted
+    @State private var keyboardAdded = false
 
     var body: some View {
         NavigationStack {
@@ -20,11 +22,17 @@ struct EnableKeyboardView: View {
                 }
 
                 Section("1 · Add the keyboard") {
-                    step("Open the Settings app")
-                    step("Go to General › Keyboard › Keyboards › Add New Keyboard…")
-                    step("Choose Scriba")
-                    step("Tap Scriba in the list and enable Allow Full Access (needed for the microphone and network)")
-                    Button("Open Settings") { openSettings() }
+                    if keyboardAdded {
+                        Label("Keyboard added", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        step("Make sure Allow Full Access is enabled (for the microphone and network)")
+                    } else {
+                        step("Open the Settings app")
+                        step("Go to General › Keyboard › Keyboards › Add New Keyboard…")
+                        step("Choose Scriba")
+                        step("Tap Scriba in the list and enable Allow Full Access (needed for the microphone and network)")
+                        Button("Open Settings") { openSettings() }
+                    }
                 }
 
                 Section("2 · Allow the microphone") {
@@ -45,6 +53,28 @@ struct EnableKeyboardView: View {
             }
             .navigationTitle("Scriba")
         }
+        .onAppear(perform: refreshState)
+        .onChange(of: scenePhase) { _, phase in
+            // Re-check when returning from Settings (where the keyboard is added /
+            // permissions are toggled).
+            if phase == .active { refreshState() }
+        }
+    }
+
+    private func refreshState() {
+        micGranted = AVAudioApplication.shared.recordPermission == .granted
+        keyboardAdded = Self.isKeyboardAdded()
+    }
+
+    /// Whether the Scriba keyboard has been added in Settings. Uses the standard
+    /// `AppleKeyboards` list; if it's unavailable this returns false and the setup
+    /// instructions simply stay visible (graceful fallback).
+    private static func isKeyboardAdded() -> Bool {
+        guard
+            let keyboards = UserDefaults.standard.object(forKey: "AppleKeyboards")
+                as? [String]
+        else { return false }
+        return keyboards.contains { $0.contains("ai.scriba.app.keyboard") }
     }
 
     private func step(_ text: String) -> some View {
