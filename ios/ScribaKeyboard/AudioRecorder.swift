@@ -32,6 +32,8 @@ final class AudioRecorder: ObservableObject {
     private let lock = NSLock()
     private var pcmSamples = [Int16]()
     private var sessionObservers: [NSObjectProtocol] = []
+    /// Caps level publishes at ~15 Hz; touched only from the serial tap callback.
+    private var levelLimiter = RateLimiter(interval: 1.0 / 15.0)
 
     enum RecorderError: Error {
         case microphoneDenied
@@ -90,7 +92,13 @@ final class AudioRecorder: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(
             false, options: [.notifyOthersOnDeactivation])
         publish(isRecording: false, level: 0)
-        let samples = lock.withLock { pcmSamples }
+        // Take the samples and clear them, so a second stop (e.g. a racing
+        // interruption) can't return the same audio twice.
+        let samples = lock.withLock {
+            let taken = pcmSamples
+            pcmSamples.removeAll(keepingCapacity: true)
+            return taken
+        }
         return WAVEncoder.encode(samples: samples, sampleRate: Int(targetSampleRate))
     }
 
@@ -164,12 +172,19 @@ final class AudioRecorder: ObservableObject {
         var samples = [Int16](repeating: 0, count: frames)
         for i in 0..<frames { samples[i] = channel[0][i] }
 
-        // RMS level (0...1) for the waveform.
-        let rms = sqrt(
-            samples.reduce(0.0) { $0 + pow(Double($1) / 32767.0, 2) } / Double(frames))
-        let normalized = Float(min(1.0, rms * 4))
-
         lock.withLock { pcmSamples.append(contentsOf: samples) }
+
+        // Publish an RMS level (0...1) for the waveform, throttled to ~15 Hz so
+        // the UI isn't re-evaluated for every audio buffer (~25-50/sec). Only
+        // accessed from the (serial) tap callback.
+        guard levelLimiter.shouldFire(at: CFAbsoluteTimeGetCurrent()) else { return }
+        var sumOfSquares = 0.0
+        for sample in samples {
+            let x = Double(sample) / 32767.0
+            sumOfSquares += x * x
+        }
+        let rms = sqrt(sumOfSquares / Double(frames))
+        let normalized = Float(min(1.0, rms * 4))
         publish(level: normalized)
     }
 
