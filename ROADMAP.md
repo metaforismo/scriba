@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 43 — 2026-06-11
+- **Fix (desktop UX):** replaced the native `confirm()` guarding **"Install Update"** (which restarts the app) in `Titlebar.tsx` with the app's branded **Dialog** modal ("Install update? … Install & restart"). Continues the alert/confirm cleanup from iter 42. Web type-check clean.
+- **Remaining native dialog:** `useAuth.ts` `alert()` (an auth error) — for a later pass; needs an error surface in the auth flow.
+- **Next:** more testable/runtime-verified work.
+
 ### Iteration 42 — 2026-06-11
 - **Fix (desktop UX):** replaced native `alert()`/`confirm()` in **General settings** (log download/clear) with the app's branded **StatusIndicator** toasts + a **Dialog** confirm modal. Native dialogs block the renderer, look unbranded, and can render poorly on a frameless/transparent Electron window. Web type-check clean.
 - **Remaining native dialogs** (for a later pass): `Titlebar.tsx:156` (confirm) and `useAuth.ts` (alert) — similar treatment.
