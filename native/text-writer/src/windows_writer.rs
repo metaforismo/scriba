@@ -31,7 +31,14 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default())
         .map_err(|e| format!("Failed to initialize enigo: {}", e))?;
 
-    // Simulate Ctrl+V (paste)
+    // Simulate Ctrl+V (paste).
+    // Use the virtual-key code (VK_V = 0x56) rather than Key::Unicode('v'):
+    // Unicode resolves via the active keyboard layout (VkKeyScanW), and on
+    // layouts with no 'v' key (Cyrillic, Greek, ...) enigo falls back to
+    // sending plain text — no Ctrl+V chord is ever delivered and the paste
+    // silently never happens.
+    const VK_V: u32 = 0x56;
+
     // Press Ctrl
     enigo
         .key(Key::Control, enigo::Direction::Press)
@@ -39,7 +46,7 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
 
     // Press V
     enigo
-        .key(Key::Unicode('v'), enigo::Direction::Press)
+        .key(Key::Other(VK_V), enigo::Direction::Press)
         .map_err(|e| format!("Failed to press V: {}", e))?;
 
     // Small delay to ensure the key press is registered
@@ -47,7 +54,7 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
 
     // Release V
     enigo
-        .key(Key::Unicode('v'), enigo::Direction::Release)
+        .key(Key::Other(VK_V), enigo::Direction::Release)
         .map_err(|e| format!("Failed to release V: {}", e))?;
 
     // Release Ctrl

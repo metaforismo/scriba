@@ -447,7 +447,9 @@ export function registerIPC() {
   handleIPC(
     'billing:confirm-session',
     async (_e, { sessionId }: { sessionId: string }) => {
-      return scribaHttpClient.post('/billing/confirm', { session_id: sessionId })
+      return scribaHttpClient.post('/billing/confirm', {
+        session_id: sessionId,
+      })
     },
   )
 

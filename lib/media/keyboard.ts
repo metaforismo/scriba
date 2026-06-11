@@ -262,7 +262,11 @@ function handleKeyEventInMain(event: KeyEvent) {
 
   if (!isShortcutGloballyEnabled) {
     // check to see if we should stop an in-progress recording (incl. hands-free)
-    if (activeShortcutId !== null || handsFreeActive || pendingTapTimer !== null) {
+    if (
+      activeShortcutId !== null ||
+      handsFreeActive ||
+      pendingTapTimer !== null
+    ) {
       activeShortcutId = null
       handsFreeActive = false
       clearPendingTap()
@@ -623,7 +627,10 @@ const getKeysToRegister = (shortcut?: KeyboardShortcutConfig): string[] => {
   }
 
   // Also block the special "fast fn" key if fn is part of the shortcut.
-  if (shortcut.keys.includes('fn')) {
+  // macOS only: code 179 is the fast-path fn key there, but on Windows it is
+  // the media Play/Pause key and must not be registered (the listener would
+  // swallow it).
+  if (process.platform === 'darwin' && shortcut.keys.includes('fn')) {
     keys.push('Unknown(179)')
   }
 
@@ -637,7 +644,11 @@ export const stopKeyListener = () => {
     // restart, or quit) so the key-up that would stop it will never arrive.
     // Cancel the orphaned session instead of leaving the recording stuck on.
     // Covers a hands-free session and a pending quick tap too.
-    if (activeShortcutId !== null || handsFreeActive || pendingTapTimer !== null) {
+    if (
+      activeShortcutId !== null ||
+      handsFreeActive ||
+      pendingTapTimer !== null
+    ) {
       console.warn(
         '[Key listener] Stopping with an active session; cancelling it to avoid an orphaned recording.',
       )

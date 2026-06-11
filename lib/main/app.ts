@@ -8,6 +8,13 @@ let pillWindow: BrowserWindow | null = null
 // Keep a reference to the main window
 export let mainWindow: BrowserWindow | null = null
 
+// Distinguishes a real quit from a dashboard-close, so Windows can hide to
+// tray on close (like macOS) instead of killing background dictation.
+let appIsQuitting = false
+app.on('before-quit', () => {
+  appIsQuitting = true
+})
+
 export function getPillWindow(): BrowserWindow | null {
   return pillWindow
 }
@@ -61,13 +68,19 @@ export function createAppWindow(): BrowserWindow {
     },
   )
 
+  // On Windows, closing the dashboard hides it to the tray — the app (pill,
+  // hotkeys, dictation) keeps running, mirroring the macOS behavior. A real
+  // quit is still available from the tray menu.
+  mainWindow.on('close', event => {
+    if (process.platform === 'win32' && !appIsQuitting) {
+      event.preventDefault()
+      mainWindow?.hide()
+    }
+  })
+
   // Clean up the reference when the window is closed.
   mainWindow.on('closed', () => {
     mainWindow = null
-    // On Windows, closing the main window should quit the entire app
-    if (process.platform === 'win32') {
-      app.quit()
-    }
   })
 
   // HMR for renderer base on electron-vite cli.

@@ -1730,7 +1730,11 @@ describe('Keyboard Module', () => {
       isShortcutGloballyEnabled: true,
       handsFreeEnabled: true,
       keyboardShortcuts: [
-        { id: 'hf-test', keys: ['command', 'space'], mode: ScribaMode.TRANSCRIBE },
+        {
+          id: 'hf-test',
+          keys: ['command', 'space'],
+          mode: ScribaMode.TRANSCRIBE,
+        },
       ],
     }
     const emit = (event: object) =>
@@ -1821,7 +1825,11 @@ describe('Keyboard Module', () => {
         isShortcutGloballyEnabled: true,
         handsFreeEnabled: true,
         keyboardShortcuts: [
-          { id: 'hf-a', keys: ['command', 'space'], mode: ScribaMode.TRANSCRIBE },
+          {
+            id: 'hf-a',
+            keys: ['command', 'space'],
+            mode: ScribaMode.TRANSCRIBE,
+          },
           { id: 'hf-b', keys: ['shift-left'], mode: ScribaMode.EDIT },
         ],
       })

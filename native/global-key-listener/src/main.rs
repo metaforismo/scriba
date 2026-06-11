@@ -142,6 +142,22 @@ fn should_block() -> bool {
     }
 }
 
+/// On macOS, rdev reports the fast-path `fn` key as `Unknown(179)`; normalize
+/// it to `Function` for hotkey detection. On other platforms code 179 is a
+/// real key (Windows: media Play/Pause), so it must NOT be treated as `fn`.
+fn normalize_key_name(key_name: &str) -> String {
+    #[cfg(target_os = "macos")]
+    if key_name == "Unknown(179)" {
+        return "Function".to_string();
+    }
+    key_name.to_string()
+}
+
+/// True only on macOS where `Unknown(179)` is the fast-path `fn` key.
+fn is_fast_fn_key(key_name: &str) -> bool {
+    cfg!(target_os = "macos") && key_name == "Unknown(179)"
+}
+
 fn callback(event: Event) -> Option<Event> {
     match event.event_type {
         EventType::KeyPress(key) => {
@@ -160,12 +176,7 @@ fn callback(event: Event) -> Option<Event> {
             }
 
             // Update pressed keys BEFORE checking if we should block
-            // Normalize Unknown(179) to Function for detection purposes
-            let normalized_key = if key_name == "Unknown(179)" {
-                "Function".to_string()
-            } else {
-                key_name.clone()
-            };
+            let normalized_key = normalize_key_name(&key_name);
 
             unsafe {
                 if !CURRENTLY_PRESSED.contains(&normalized_key) {
@@ -208,14 +219,14 @@ fn callback(event: Event) -> Option<Event> {
                     }
                 }
                 None // Block the event from reaching the OS
-            } else if key_name == "Unknown(179)"
+            } else if is_fast_fn_key(&key_name)
                 && unsafe {
                     REGISTERED_HOTKEYS
                         .iter()
                         .any(|hotkey| hotkey.keys.contains(&"Function".to_string()))
                 }
             {
-                None // Block Unknown(179) if any hotkey uses Function
+                None // Block the fast fn key if any hotkey uses Function
             } else {
                 Some(event) // Let it through
             }
@@ -223,12 +234,7 @@ fn callback(event: Event) -> Option<Event> {
         EventType::KeyRelease(key) => {
             let key_name = format!("{:?}", key);
 
-            // Normalize Unknown(179) to Function for detection purposes
-            let normalized_key = if key_name == "Unknown(179)" {
-                "Function".to_string()
-            } else {
-                key_name.clone()
-            };
+            let normalized_key = normalize_key_name(&key_name);
 
             // Update pressed keys
             unsafe {

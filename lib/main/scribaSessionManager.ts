@@ -243,7 +243,10 @@ export class ScribaSessionManager {
         await responsePromise
       } catch (error) {
         // Expected cancellation error, log and ignore
-        console.log('[scribaSessionManager] Stream cancelled as expected:', error)
+        console.log(
+          '[scribaSessionManager] Stream cancelled as expected:',
+          error,
+        )
       }
     } finally {
       finishTeardown()
@@ -366,7 +369,9 @@ export class ScribaSessionManager {
         recordingStateNotifier.notifyProcessingStopped()
       }
     } else {
-      console.warn('[scribaSessionManager] No stream response promise to wait for')
+      console.warn(
+        '[scribaSessionManager] No stream response promise to wait for',
+      )
       recordingStateNotifier.notifyProcessingStopped()
     }
   }
@@ -424,7 +429,9 @@ export class ScribaSessionManager {
         if (!inserted) {
           try {
             clipboard.writeText(textToInsert)
-            recordingStateNotifier.notifyError('Insert failed — copied to clipboard')
+            recordingStateNotifier.notifyError(
+              'Insert failed — copied to clipboard',
+            )
           } catch (clipboardError) {
             log.error(
               '[scribaSessionManager] Clipboard fallback failed:',
@@ -470,7 +477,10 @@ export class ScribaSessionManager {
   }
 
   /** Maps a server-returned protobuf ClientError to a short user-facing message. */
-  private friendlyResponseError(error: { code?: string; message?: string }): string {
+  private friendlyResponseError(error: {
+    code?: string
+    message?: string
+  }): string {
     switch (error?.code) {
       case 'CLIENT_NO_SPEECH_DETECTED':
         return 'No speech detected'
