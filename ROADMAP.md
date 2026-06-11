@@ -81,7 +81,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 - [ ] **Runtime footprint** — profile/idle RAM+CPU; stay well under Wispr's ~800MB/8%. Never freeze the target app (their Windows VS Code bug).
 - [ ] **Remove dead V1 path** (`transcribeStreamHandler.ts` `@deprecated`, `grpcClient.transcribeStream`/`getHeadersWithMetadata`) — duplicated context-gather work, maintenance noise.
 - [ ] **Windows parity** — accessibility context / selected-text / cursor-context are macOS-only (`ContextGrabber.ts:99`, `main.ts:136`).
-- [ ] **Whisper prompt 224-token overflow** — large dictionaries silently truncate (`transcription.ts:4,32-42`).
+- [x] **Whisper prompt 224-token overflow** — resolved: `transcription.ts` does non-ASCII-conservative token estimation + term-aware truncation (keeps whole terms) and **logs** when it truncates (no longer silent).
 
 ### P5 — Business model edge (beat them)
 - [ ] **BYOK** (bring your own API key). · **On-device/offline mode** (local Whisper-class). · **MCP / IDE (VS Code/Cursor) integration.** · Lifetime/cheaper pricing + generous free tier. · Public status page + auditable privacy.
@@ -95,6 +95,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 52 — 2026-06-11 (iOS CJK spacing bug) — PR #20
+- **Fix (iOS, multilingual bug):** the smart-spacing helper used `Character.isLetter`, which is **true for CJK** — so dictating after Chinese/Japanese/Korean text wrongly inserted a space (`你好`+`世界` → `你好 世界`). Since Scriba ships zh/ja/ko in the language picker, this hit real users. Now skips the space when the preceding char is CJK (ideographs, kana, Hangul); space-using scripts incl. accented Latin are unaffected. +2 tests; 28 iOS tests pass. PR #20 → merged.
+- **Also confirmed resolved:** the Whisper-prompt 224-token overflow (backlog) — `transcription.ts` already does term-aware truncation **and logs** what it drops (not silent).
+- **Next:** more research-driven, testable/runtime-verified work.
 
 ### Iteration 51 — 2026-06-11
 - **Feat (server, Wispr parity):** the cleanup pass now renders **clearly-spoken emails, URLs, and @handles in written form** ("john at gmail dot com" → "john@gmail.com", "github dot com slash scriba" → "github.com/scriba") — added the guideline to both the light and heavy cleanup prompts. Cleanup tests + type-check pass. Direct to main (prompt-only, low-risk).
