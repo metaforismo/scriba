@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 62 — 2026-06-11 (hands-free same-shortcut fix from review)
+- **Fix (desktop, found by a code-review subagent on the new hands-free logic):** the double-tap check only tested `pendingTapTimer !== null`, not that the 2nd press was the **same** shortcut. With hands-free on + multiple shortcuts, tapping A then pressing a different B within the window was mis-read as a double-tap of A (kept recording in A's mode, B's mode never applied, forced an unrequested hands-free session). Now tracks `pendingTapShortcutId`; only the same shortcut upgrades to hands-free, a different one completes the pending tap and starts fresh. +1 regression test; keyboard suite green (48). Direct to main.
+- **Process:** the review subagent has now found real bugs **three times** (iters 58, 61, 62) — reviewing complex/concurrent code right after writing it is a reliable win.
+- **Next:** continue Wispr-parity polish / fixes.
+
 ### Iteration 61 — 2026-06-11 (iOS dictation race/lifecycle fixes from review) — PR #26
 - **Fix (iOS, found by a fresh code-review subagent on the audio/dictation stack):** real bugs in the code just written. (1) **Double-start crash** — `state` flips to `.recording` only after the async `recorder.start()`, so two quick taps both started → a 2nd `installTap` throws an uncatchable NSException; added an `isStarting` guard set before the await. (2) **Empty-audio dead path** — `recorder.stop()` always returns ≥44 bytes (WAV header) so `audio.isEmpty` was never true → no-speech taps got POSTed + errored; guard on `audio.count > WAVEncoder.headerSize`. (3) **Stale interim leak** — clear `LiveTranscriber.interim` before the availability guard (+ in `stop()`). (4) Minor: tear down session/observers on a failed `engine.start()`. Build + 31 tests green. PR #26 → merged.
 - **Process win:** the code-review subagent has now found real bugs twice (iters 58, 61) — running it after writing complex/concurrent code is worth it.
