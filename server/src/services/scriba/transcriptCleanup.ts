@@ -13,6 +13,25 @@ export interface CleanupLlmSettings {
 }
 
 /**
+ * Builds the cleanup user prompt. When the active app is known, adds a note so
+ * the LLM formats appropriately for that medium (à la Wispr Flow's context-aware
+ * formatting) — structured for an email client, concise for a chat app — while
+ * preserving the user's wording, meaning, and any names/dates/numbers. Pure +
+ * exported so it's unit-testable.
+ */
+export function buildCleanupUserPrompt(
+  instruction: string,
+  transcript: string,
+  appName?: string,
+): string {
+  const app = appName?.trim()
+  const appLine = app
+    ? `\n\nThe user is dictating into "${app}". Format appropriately for that medium (e.g. cleaner structure for an email, concise for a chat or messaging app) while preserving the user's wording, meaning, and any names, dates, and numbers.`
+    : ''
+  return `${instruction}${appLine}\n\nTranscript:\n${transcript}`
+}
+
+/**
  * Runs the optional dictation cleanup pass (light/heavy) over a transcript.
  *
  * Shared by the streaming V2 handler and the mobile `/v1/transcribe` endpoint so
@@ -24,6 +43,7 @@ export async function cleanupTranscript(
   transcript: string,
   level: TranscriptCleanupLevel,
   settings: CleanupLlmSettings,
+  appName?: string,
 ): Promise<string> {
   if (level === 'verbatim' || !transcript.trim()) {
     return transcript
@@ -34,7 +54,7 @@ export async function cleanupTranscript(
 
   try {
     const cleaned = await llmProvider.adjustTranscript(
-      `${instruction}\n\nTranscript:\n${transcript}`,
+      buildCleanupUserPrompt(instruction, transcript, appName),
       {
         temperature: settings.llmTemperature,
         model: settings.llmModel,

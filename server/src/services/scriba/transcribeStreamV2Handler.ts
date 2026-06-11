@@ -172,7 +172,13 @@ export class TranscribeStreamV2Handler {
       if (mode === ScribaMode.TRANSCRIBE && cleanupLevel !== 'verbatim') {
         transcript = await serverTimingCollector.timeAsync(
           ServerTimingEventName.LLM_ADJUSTMENT,
-          () => cleanupTranscript(transcript, cleanupLevel, advancedSettings),
+          () =>
+            cleanupTranscript(
+              transcript,
+              cleanupLevel,
+              advancedSettings,
+              windowContext.appName,
+            ),
           interactionId,
         )
       }
