@@ -1,16 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// What kind of text field the keyboard is currently editing — drives whether we
-/// show the dictation UI or prompt the user to switch to the system keyboard.
-/// Like Wispr Flow, voice dictation isn't useful for number/phone or secure
-/// (password) fields, so we step aside there.
-enum FieldMode: Equatable {
-    case voice
-    case numeric
-    case secure
-}
-
+/// Tracks what kind of text field the keyboard is currently editing so the UI can
+/// adapt (see `FieldMode`).
 @MainActor
 final class KeyboardContext: ObservableObject {
     @Published var fieldMode: FieldMode = .voice
@@ -19,21 +11,8 @@ final class KeyboardContext: ObservableObject {
     func update(from proxy: UITextDocumentProxy) {
         // `isSecureTextEntry` is optional on UITextDocumentProxy; nil means the
         // host didn't declare it, so treat only an explicit true as secure.
-        if proxy.isSecureTextEntry == true {
-            fieldMode = .secure
-        } else if Self.isNumeric(proxy.keyboardType) {
-            fieldMode = .numeric
-        } else {
-            fieldMode = .voice
-        }
-    }
-
-    private static func isNumeric(_ type: UIKeyboardType?) -> Bool {
-        switch type {
-        case .numberPad, .phonePad, .decimalPad, .asciiCapableNumberPad:
-            return true
-        default:
-            return false
-        }
+        fieldMode = FieldMode.from(
+            keyboardType: proxy.keyboardType,
+            isSecure: proxy.isSecureTextEntry == true)
     }
 }
