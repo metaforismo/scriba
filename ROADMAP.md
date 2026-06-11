@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 55 — 2026-06-11 (iOS FieldMode classification tested) — PR #22
+- **Test (iOS):** the field classification (secure / numeric / voice) decides the whole keyboard surface (number pad vs dictation vs system-keyboard fallback) but was a private helper on the `@MainActor` `KeyboardContext`. Extracted `FieldMode` + a pure `FieldMode.from(keyboardType:isSecure:)` into its own file and tested it (secure overrides; 4 numeric keyboard types → `.numeric`; text types incl. nil → `.voice`). **31 iOS tests total, TEST SUCCEEDED.** PR #22 → merged.
+- **iOS test coverage (31):** smart-spacing (+CJK), WAV, PKCE, form-encoding, OAuth/CSRF, Credentials, FieldMode.
+- **Next:** more testable/research-driven work.
+
 ### Iteration 54 — 2026-06-11 (iOS onboarding: keyboard detection + foreground refresh) — PR #21
 - **Runtime-verified** the onboarding by driving the sim: tapped "Allow microphone" → the system prompt appeared with the correct usage string ("Scriba uses the microphone to transcribe your speech into text."); granting flipped step 2 to "✓ Microphone access granted". The mic flow works end-to-end.
 - **Feat (iOS):** step 1 (add the keyboard) was purely instructional — now detects whether the Scriba keyboard has been added (standard `AppleKeyboards` list; graceful fallback to instructions) and shows "Keyboard added". Both steps now re-check on `scenePhase .active` so the screen updates when the user returns from Settings. Build- + runtime-verified. PR #21 → merged.
