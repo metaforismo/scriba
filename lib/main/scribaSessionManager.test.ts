@@ -224,6 +224,52 @@ describe('scribaSessionManager', () => {
     ).toHaveBeenCalledTimes(1)
   })
 
+  test('startSession waits for an in-flight stop teardown (stop→start same tick)', async () => {
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    // Session A is running.
+    await session.startSession(ScribaMode.TRANSCRIBE)
+
+    const order: string[] = []
+    let releaseTeardown: () => void = () => {}
+    mockVoiceInputService.stopAudioRecording.mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          releaseTeardown = () => {
+            order.push('teardown-finished')
+            resolve()
+          }
+        }),
+    )
+    mockScribaStreamController.initialize.mockImplementation(() => {
+      order.push('initialize-B')
+      return Promise.resolve(true)
+    })
+
+    // Same-tick stop + start, as when a pending tap is interrupted by a new
+    // shortcut: B must not initialize while A is still tearing down.
+    const completePromise = session.completeSession()
+    const startPromise = session.startSession(ScribaMode.EDIT)
+
+    // Flush microtasks: B should still be parked behind A's teardown.
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+    expect(order).not.toContain('initialize-B')
+
+    releaseTeardown()
+    await Promise.all([completePromise, startPromise])
+
+    expect(order.indexOf('teardown-finished')).toBeLessThan(
+      order.indexOf('initialize-B'),
+    )
+
+    // Restore the default implementation for subsequent tests (mockClear in
+    // beforeEach does not undo mockImplementation).
+    mockVoiceInputService.stopAudioRecording.mockImplementation(() =>
+      Promise.resolve(),
+    )
+  })
+
   test('should fetch and send context in background', async () => {
     const { ScribaSessionManager } = await import('./scribaSessionManager')
     const session = new ScribaSessionManager()

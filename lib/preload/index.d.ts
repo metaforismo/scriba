@@ -61,7 +61,7 @@ declare global {
       blockKeys: (keys: string[]) => Promise<void>
       unblockKey: (key: string) => Promise<void>
       getBlockedKeys: () => Promise<void>
-      onKeyEvent: (callback: (event: KeyEvent) => void) => void
+      onKeyEvent: (callback: (event: KeyEvent) => void) => () => void
       send: (channel: string, data: any) => void
       on: (channel: string, callback: (...args: any[]) => void) => () => void
       setPillMouseEvents: (

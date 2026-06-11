@@ -7,6 +7,9 @@ import { getNativeBinaryPath } from './native-interface'
 const MSG_TYPE_JSON = 1
 const MSG_TYPE_AUDIO = 2
 
+// Emit volume-meter updates at most this often (~15Hz is plenty for the UI).
+const VOLUME_EMIT_INTERVAL_MS = 66
+
 interface Message {
   type: 'json' | 'audio'
   payload: Buffer
@@ -20,9 +23,13 @@ class AudioRecorderService extends EventEmitter {
     reject: (reason?: any) => void
   } | null = null
   #drainPromise: {
+    promise: Promise<void>
     resolve: () => void
     reject: (reason?: any) => void
   } | null = null
+  // Volume meter updates drive ~30-50 IPC messages/sec if emitted per chunk;
+  // the UI meters only need ~15Hz, so skip the RMS pass entirely in between.
+  #lastVolumeEmitAt = 0
 
   constructor() {
     super()
@@ -85,6 +92,8 @@ class AudioRecorderService extends EventEmitter {
    * Sends a command to start recording from a specific device.
    */
   public startRecording(deviceName: string): void {
+    // Fresh recording → emit the first meter update immediately.
+    this.#lastVolumeEmitAt = 0
     this.#sendCommand({ command: 'start', device_name: deviceName })
     console.log(`[AudioService] Recording started on device: ${deviceName}`)
   }
@@ -228,46 +237,55 @@ class AudioRecorderService extends EventEmitter {
         }
       }
     } else if (message.type === 'audio') {
-      const volume = this.#calculateVolume(message.payload)
-
-      this.emit('volume-update', volume)
+      const now = Date.now()
+      if (now - this.#lastVolumeEmitAt >= VOLUME_EMIT_INTERVAL_MS) {
+        this.#lastVolumeEmitAt = now
+        this.emit('volume-update', this.#calculateVolume(message.payload))
+      }
       this.emit('audio-chunk', message.payload)
     }
   }
 
   public awaitDrainComplete(timeoutMs: number = 500): Promise<void> {
+    // A drain is already pending (overlapping stops): share its outcome.
+    // Replacing it would leave the first caller's promise unsettled forever,
+    // hanging that stop flow.
     if (this.#drainPromise) {
-      return new Promise((resolve, reject) => {
-        this.once('error', reject)
-        this.#drainPromise = { resolve, reject }
-      })
+      return this.#drainPromise.promise
     }
-    return new Promise((resolve, reject) => {
-      let settled = false
-      const onTimeout = setTimeout(() => {
+
+    let settled = false
+    let resolveOut: () => void = () => {}
+    let rejectOut: (reason?: any) => void = () => {}
+    const promise = new Promise<void>((resolve, reject) => {
+      resolveOut = resolve
+      rejectOut = reject
+    })
+    const onTimeout = setTimeout(() => {
+      if (!settled) {
+        settled = true
+        this.#drainPromise = null
+        resolveOut() // fallback: do not hang the stop flow
+      }
+    }, timeoutMs)
+    this.#drainPromise = {
+      promise,
+      resolve: () => {
         if (!settled) {
           settled = true
-          this.#drainPromise = null
-          resolve() // fallback: do not hang the stop flow
+          clearTimeout(onTimeout)
+          resolveOut()
         }
-      }, timeoutMs)
-      this.#drainPromise = {
-        resolve: () => {
-          if (!settled) {
-            settled = true
-            clearTimeout(onTimeout)
-            resolve()
-          }
-        },
-        reject: (err?: any) => {
-          if (!settled) {
-            settled = true
-            clearTimeout(onTimeout)
-            reject(err)
-          }
-        },
-      }
-    })
+      },
+      reject: (err?: any) => {
+        if (!settled) {
+          settled = true
+          clearTimeout(onTimeout)
+          rejectOut(err)
+        }
+      },
+    }
+    return promise
   }
 
   #sendCommand(command: object): void {

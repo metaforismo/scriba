@@ -53,7 +53,13 @@ const api = {
   onKeyEvent: (callback: (event: any) => void) => {
     const handler = (_: any, event: any) => callback(event)
     ipcRenderer.on('key-event', handler)
-    return () => ipcRenderer.removeListener('key-event', handler)
+    // The main process only forwards global key events to webContents that
+    // asked for them (perf + privacy), so opt in while subscribed.
+    ipcRenderer.invoke('set-key-event-forwarding', true)
+    return () => {
+      ipcRenderer.removeListener('key-event', handler)
+      ipcRenderer.invoke('set-key-event-forwarding', false)
+    }
   },
   // Auth methods
   generateNewAuthState: () => ipcRenderer.invoke('generate-new-auth-state'),

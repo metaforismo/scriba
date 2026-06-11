@@ -1,5 +1,11 @@
 import { run, get, all } from './utils'
-import type { Interaction, Note, DictionaryItem, UserMetadata } from './models'
+import type {
+  Interaction,
+  InteractionSummary,
+  Note,
+  DictionaryItem,
+  UserMetadata,
+} from './models'
 import { PaidStatus } from './models'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -122,14 +128,25 @@ export class InteractionsTable {
     return row ? parseInteractionJsonFields(row) : undefined
   }
 
-  static async findAll(user_id?: string): Promise<Interaction[]> {
+  // Deliberately excludes the raw_audio BLOB: the list is refetched after
+  // every dictation, and audio is only needed on demand (findById).
+  static async findAllSummaries(
+    user_id?: string,
+  ): Promise<InteractionSummary[]> {
+    const columns =
+      'id, user_id, title, asr_output, llm_output, raw_audio_id, duration_ms, sample_rate, created_at, updated_at, deleted_at, raw_audio IS NOT NULL AS has_audio'
     const query = user_id
-      ? 'SELECT * FROM interactions WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC'
-      : 'SELECT * FROM interactions WHERE user_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC'
+      ? `SELECT ${columns} FROM interactions WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC`
+      : `SELECT ${columns} FROM interactions WHERE user_id IS NULL AND deleted_at IS NULL ORDER BY created_at DESC`
     const params = user_id ? [user_id] : []
-    const rows = await all<Interaction>(query, params)
+    const rows = await all<InteractionSummary>(query, params)
 
-    return rows.map(parseInteractionJsonFields)
+    return rows.map(row => {
+      row.asr_output = parseJsonField(row.asr_output)
+      row.llm_output = parseJsonField(row.llm_output)
+      row.has_audio = Boolean(row.has_audio) // SQLite returns 0/1
+      return row
+    })
   }
 
   static async softDelete(id: string): Promise<void> {

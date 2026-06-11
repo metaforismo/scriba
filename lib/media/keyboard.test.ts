@@ -83,6 +83,17 @@ mock.module('electron', () => ({
   BrowserWindow: mockBrowserWindow,
 }))
 
+// Mock WebContents factory for setKeyEventForwarding() subscribers.
+let nextMockWebContentsId = 1
+function createMockWebContents(destroyed = false) {
+  return {
+    id: nextMockWebContentsId++,
+    send: mock(),
+    isDestroyed: mock(() => destroyed),
+    once: mock(),
+  } as any
+}
+
 const mockAudioRecorderService = {
   stopRecording: mock(),
 }
@@ -227,8 +238,12 @@ describe('Keyboard Module', () => {
 
   describe('Message Parsing Business Logic', () => {
     test('should handle fragmented JSON from stdout', async () => {
-      const { startKeyListener } = await import('./keyboard')
+      const { startKeyListener, setKeyEventForwarding } = await import(
+        './keyboard'
+      )
 
+      const subscriber = createMockWebContents()
+      setKeyEventForwarding(subscriber, true)
       startKeyListener()
 
       const keyEvent = {
@@ -247,15 +262,16 @@ describe('Keyboard Module', () => {
       mockChildProcess.stdout.emit('data', Buffer.from(fragment2))
 
       // Should still process the complete event
-      expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-        'key-event',
-        keyEvent,
-      )
+      expect(subscriber.send).toHaveBeenCalledWith('key-event', keyEvent)
     })
 
     test('should handle multiple events in single data chunk', async () => {
-      const { startKeyListener } = await import('./keyboard')
+      const { startKeyListener, setKeyEventForwarding } = await import(
+        './keyboard'
+      )
 
+      const subscriber = createMockWebContents()
+      setKeyEventForwarding(subscriber, true)
       startKeyListener()
 
       const event1 = {
@@ -276,15 +292,9 @@ describe('Keyboard Module', () => {
       mockChildProcess.stdout.emit('data', Buffer.from(combinedData))
 
       // Should process both events
-      expect(mockWindow.webContents.send).toHaveBeenCalledTimes(2)
-      expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-        'key-event',
-        event1,
-      )
-      expect(mockWindow.webContents.send).toHaveBeenCalledWith(
-        'key-event',
-        event2,
-      )
+      expect(subscriber.send).toHaveBeenCalledTimes(2)
+      expect(subscriber.send).toHaveBeenCalledWith('key-event', event1)
+      expect(subscriber.send).toHaveBeenCalledWith('key-event', event2)
     })
 
     test('should handle malformed JSON gracefully', async () => {
@@ -303,89 +313,89 @@ describe('Keyboard Module', () => {
     })
   })
 
-  describe('Window Event Broadcasting Business Logic', () => {
-    test('should broadcast events to all non-destroyed windows', async () => {
-      const { startKeyListener } = await import('./keyboard')
+  describe('Key-Event Forwarding Business Logic', () => {
+    const keyEvent = {
+      type: 'keydown',
+      key: 'KeyA',
+      timestamp: '2024-01-01T00:00:00.000Z',
+      raw_code: 65,
+    }
 
-      // Create multiple windows
-      const window1 = {
-        webContents: {
-          send: mock(),
-          isDestroyed: mock(() => false),
-        },
-      }
-      const window2 = {
-        webContents: {
-          send: mock(),
-          isDestroyed: mock(() => false),
-        },
-      }
-      mockBrowserWindow.getAllWindows.mockReturnValue([window1, window2])
+    test('should forward events only to subscribed webContents', async () => {
+      const { startKeyListener, setKeyEventForwarding } = await import(
+        './keyboard'
+      )
+
+      const subscriber = createMockWebContents()
+      const nonSubscriber = createMockWebContents()
+      setKeyEventForwarding(subscriber, true)
 
       startKeyListener()
-
-      const keyEvent = {
-        type: 'keydown',
-        key: 'KeyA',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        raw_code: 65,
-      }
       mockChildProcess.stdout.emit(
         'data',
         Buffer.from(JSON.stringify(keyEvent) + '\n'),
       )
 
-      // Should send to both windows
-      expect(window1.webContents.send).toHaveBeenCalledWith(
-        'key-event',
-        keyEvent,
-      )
-      expect(window2.webContents.send).toHaveBeenCalledWith(
-        'key-event',
-        keyEvent,
-      )
+      expect(subscriber.send).toHaveBeenCalledWith('key-event', keyEvent)
+      expect(nonSubscriber.send).not.toHaveBeenCalled()
     })
 
-    test('should skip destroyed windows when broadcasting events', async () => {
-      const { startKeyListener } = await import('./keyboard')
+    test('should stop forwarding after unsubscribe', async () => {
+      const { startKeyListener, setKeyEventForwarding } = await import(
+        './keyboard'
+      )
 
-      // Create windows with one destroyed
-      const window1 = {
-        webContents: {
-          send: mock(),
-          isDestroyed: mock(() => false),
-        },
-      }
-      const destroyedWindow = {
-        webContents: {
-          send: mock(),
-          isDestroyed: mock(() => true),
-        },
-      }
-      mockBrowserWindow.getAllWindows.mockReturnValue([
-        window1,
-        destroyedWindow,
-      ])
+      const subscriber = createMockWebContents()
+      setKeyEventForwarding(subscriber, true)
+      setKeyEventForwarding(subscriber, false)
 
       startKeyListener()
-
-      const keyEvent = {
-        type: 'keydown',
-        key: 'KeyA',
-        timestamp: '2024-01-01T00:00:00.000Z',
-        raw_code: 65,
-      }
       mockChildProcess.stdout.emit(
         'data',
         Buffer.from(JSON.stringify(keyEvent) + '\n'),
       )
 
-      // Should only send to non-destroyed window
-      expect(window1.webContents.send).toHaveBeenCalledWith(
-        'key-event',
-        keyEvent,
+      expect(subscriber.send).not.toHaveBeenCalled()
+    })
+
+    test('should keep forwarding while another subscription from the same webContents is active', async () => {
+      const { startKeyListener, setKeyEventForwarding } = await import(
+        './keyboard'
       )
-      expect(destroyedWindow.webContents.send).not.toHaveBeenCalled()
+
+      // Two editors in the same window subscribe; one unsubscribes.
+      const subscriber = createMockWebContents()
+      setKeyEventForwarding(subscriber, true)
+      setKeyEventForwarding(subscriber, true)
+      setKeyEventForwarding(subscriber, false)
+
+      startKeyListener()
+      mockChildProcess.stdout.emit(
+        'data',
+        Buffer.from(JSON.stringify(keyEvent) + '\n'),
+      )
+
+      expect(subscriber.send).toHaveBeenCalledWith('key-event', keyEvent)
+    })
+
+    test('should skip destroyed webContents when forwarding events', async () => {
+      const { startKeyListener, setKeyEventForwarding } = await import(
+        './keyboard'
+      )
+
+      const subscriber = createMockWebContents()
+      const destroyedSubscriber = createMockWebContents(true)
+      setKeyEventForwarding(subscriber, true)
+      setKeyEventForwarding(destroyedSubscriber, true)
+
+      startKeyListener()
+      mockChildProcess.stdout.emit(
+        'data',
+        Buffer.from(JSON.stringify(keyEvent) + '\n'),
+      )
+
+      expect(subscriber.send).toHaveBeenCalledWith('key-event', keyEvent)
+      expect(destroyedSubscriber.send).not.toHaveBeenCalled()
     })
   })
 
@@ -582,53 +592,37 @@ describe('Keyboard Module', () => {
         Buffer.from(JSON.stringify(otherKey) + '\n'),
       )
 
-      expect(mockScribaSessionManager.completeSession).toHaveBeenCalled()
+      // Disabling dictation aborts the in-flight recording (no text insertion).
+      expect(mockScribaSessionManager.cancelSession).toHaveBeenCalled()
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
       expect(console.info).toHaveBeenCalledWith(
-        'Shortcut DEACTIVATED, stopping recording...',
+        'Shortcut DEACTIVATED, cancelling recording...',
       )
     })
 
     test('should ignore fast fn key events', async () => {
-      // Create fresh mock objects for this test to avoid isolation issues
-      const freshMockWindow = {
-        webContents: {
-          send: mock(),
-          isDestroyed: mock(() => false),
-        },
+      const { startKeyListener, setKeyEventForwarding } = await import(
+        './keyboard'
+      )
+
+      const subscriber = createMockWebContents()
+      setKeyEventForwarding(subscriber, true)
+      startKeyListener()
+
+      const fastFnEvent = {
+        type: 'keydown',
+        key: 'Unknown(179)',
+        timestamp: '2024-01-01T00:00:00.000Z',
+        raw_code: 179,
       }
+      mockChildProcess.stdout.emit(
+        'data',
+        Buffer.from(JSON.stringify(fastFnEvent) + '\n'),
+      )
 
-      const freshMockBrowserWindow = {
-        getAllWindows: mock(() => [freshMockWindow]),
-      }
-
-      // Temporarily override the electron mock for this test
-      const originalGetAllWindows = mockBrowserWindow.getAllWindows
-      mockBrowserWindow.getAllWindows = freshMockBrowserWindow.getAllWindows
-
-      try {
-        const { startKeyListener } = await import('./keyboard')
-        startKeyListener()
-
-        const fastFnEvent = {
-          type: 'keydown',
-          key: 'Unknown(179)',
-          timestamp: '2024-01-01T00:00:00.000Z',
-          raw_code: 179,
-        }
-        mockChildProcess.stdout.emit(
-          'data',
-          Buffer.from(JSON.stringify(fastFnEvent) + '\n'),
-        )
-
-        // Should still forward to windows but not affect shortcut state
-        expect(freshMockWindow.webContents.send).toHaveBeenCalledWith(
-          'key-event',
-          fastFnEvent,
-        )
-      } finally {
-        // Restore original mock
-        mockBrowserWindow.getAllWindows = originalGetAllWindows
-      }
+      // Should still forward to subscribers but not affect shortcut state
+      expect(subscriber.send).toHaveBeenCalledWith('key-event', fastFnEvent)
+      expect(mockScribaSessionManager.startSession).not.toHaveBeenCalled()
     })
 
     test('should handle complex multi-key shortcuts', async () => {
@@ -1847,6 +1841,119 @@ describe('Keyboard Module', () => {
       expect(mockScribaSessionManager.startSession).toHaveBeenLastCalledWith(
         ScribaMode.EDIT,
       )
+    })
+
+    test('an accidental double-tap on stop does not start a spurious session', async () => {
+      mockMainStore.get.mockReturnValue(handsFreeSettings)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // Enter hands-free, then stop it with a tap.
+      tap()
+      tap()
+      down('MetaLeft')
+      down('Space')
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+      up('MetaLeft')
+      up('Space')
+
+      // An immediate second tap (accidental double-tap on "stop") must be
+      // swallowed instead of starting a near-empty recording.
+      clock.tick(100)
+      tap()
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+
+      // After the window has passed, dictation works again.
+      clock.tick(400)
+      tap()
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(2)
+    })
+
+    test('toggling hands-free off mid hands-free session completes it on the next key event', async () => {
+      let handsFreeEnabled = true
+      mockMainStore.get.mockImplementation(() => ({
+        ...handsFreeSettings,
+        handsFreeEnabled,
+      }))
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // Enter hands-free (keys released, session recording).
+      tap()
+      tap()
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      handsFreeEnabled = false
+
+      // Any key event reconciles the orphaned hands-free session.
+      down('KeyA')
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+      up('KeyA')
+
+      // The shortcut now behaves as plain push-to-talk: press starts a session,
+      // it is NOT misread as a "stop hands-free" tap.
+      down('MetaLeft')
+      down('Space')
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(2)
+      clock.tick(300) // hold
+      up('MetaLeft')
+      up('Space')
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(2)
+    })
+
+    test('toggling hands-free off with a pending tap settles it before the next session', async () => {
+      let handsFreeEnabled = true
+      mockMainStore.get.mockImplementation(() => ({
+        ...handsFreeSettings,
+        handsFreeEnabled,
+      }))
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // Quick tap → completion pending on the double-tap timer.
+      tap()
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      handsFreeEnabled = false
+
+      // Pressing the shortcut again completes the pending tap and starts a
+      // fresh push-to-talk session — never a hands-free upgrade.
+      down('MetaLeft')
+      down('Space')
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(2)
+
+      // The old pending timer must be dead: advancing time completes nothing new.
+      clock.tick(400)
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+    })
+
+    test('Escape during the pending-tap window cancels instead of completing', async () => {
+      mockMainStore.get.mockReturnValue(handsFreeSettings)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      tap()
+      down('Escape')
+      expect(mockScribaSessionManager.cancelSession).toHaveBeenCalledTimes(1)
+
+      // The pending timer was cleared: no completion fires later.
+      clock.tick(400)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+    })
+
+    test('stopKeyListener with a pending tap cancels the orphaned session', async () => {
+      mockMainStore.get.mockReturnValue(handsFreeSettings)
+      const { startKeyListener, stopKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      tap()
+      stopKeyListener()
+      expect(mockScribaSessionManager.cancelSession).toHaveBeenCalledTimes(1)
+
+      clock.tick(400)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
     })
   })
 })

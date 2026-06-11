@@ -18,9 +18,6 @@ pub fn type_text_macos(text: &str, _char_delay: u64) -> Result<(), String> {
         // Get the general pasteboard
         let pasteboard = NSPasteboard::generalPasteboard(nil);
 
-        // Store current clipboard contents to restore later
-        let old_contents = pasteboard.stringForType(NSPasteboardTypeString);
-
         // Clear the pasteboard and set our text
         pasteboard.clearContents();
         let ns_string = NSString::alloc(nil).init_str(text);
@@ -67,23 +64,9 @@ pub fn type_text_macos(text: &str, _char_delay: u64) -> Result<(), String> {
         thread::sleep(Duration::from_millis(10));
         key_v_up.post(core_graphics::event::CGEventTapLocation::HID);
 
-        // Restore old clipboard contents in background after delay in separate thread
-        // to not block
-        if old_contents != nil {
-            // Convert Objective-C string to Rust String to make it Send-safe
-            let old_contents_str = {
-                let c_str = cocoa::foundation::NSString::UTF8String(old_contents);
-                std::ffi::CStr::from_ptr(c_str)
-                    .to_string_lossy()
-                    .into_owned()
-            };
-
-            thread::sleep(Duration::from_secs(1));
-            let pasteboard = NSPasteboard::generalPasteboard(nil);
-            pasteboard.clearContents();
-            let ns_string = NSString::alloc(nil).init_str(&old_contents_str);
-            pasteboard.setString_forType(ns_string, NSPasteboardTypeString);
-        }
+        // Clipboard restore is handled by the Electron main process: this
+        // one-shot binary must exit promptly, so it cannot wait ~1s for the
+        // target app to consume the paste before restoring.
 
         Ok(())
     }

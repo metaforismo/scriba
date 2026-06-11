@@ -8,9 +8,6 @@ use std::time::Duration;
 /// This mimics the macOS implementation to avoid character-by-character typing
 /// issues
 pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
-    // Store current clipboard contents to restore later
-    let old_contents: Result<String, _> = get_clipboard(formats::Unicode);
-
     // Set our text to clipboard
     set_clipboard(formats::Unicode, text)
         .map_err(|e| format!("Failed to set clipboard: {:?}", e))?;
@@ -58,10 +55,9 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
         .key(Key::Control, enigo::Direction::Release)
         .map_err(|e| format!("Failed to release Ctrl: {}", e))?;
 
-    if let Ok(old_text) = old_contents {
-        thread::sleep(Duration::from_secs(1));
-        let _ = set_clipboard(formats::Unicode, &old_text);
-    }
+    // Clipboard restore is handled by the Electron main process: this
+    // one-shot binary must exit promptly, so it cannot wait ~1s for the
+    // target app to consume the paste before restoring.
 
     Ok(())
 }

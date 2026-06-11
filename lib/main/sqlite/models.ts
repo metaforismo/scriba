@@ -13,6 +13,13 @@ export interface Interaction {
   deleted_at: string | null
 }
 
+// List row without the raw_audio BLOB (which can be megabytes per dictation —
+// shipping it for every row on every list refresh is wasteful). `has_audio`
+// says whether the audio can be fetched lazily via findById.
+export type InteractionSummary = Omit<Interaction, 'raw_audio'> & {
+  has_audio: boolean
+}
+
 export interface Note {
   id: string
   user_id: string

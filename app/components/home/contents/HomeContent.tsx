@@ -12,7 +12,7 @@ import { EXTERNAL_LINKS } from '@/lib/constants/external-links'
 import { useSettingsStore } from '../../../store/useSettingsStore'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../ui/tooltip'
 import { useAuthStore } from '@/app/store/useAuthStore'
-import { Interaction } from '@/lib/main/sqlite/models'
+import { InteractionSummary } from '@/lib/main/sqlite/models'
 import { TotalWordsIcon } from '../../icons/TotalWordsIcon'
 import { SpeedIcon } from '../../icons/SpeedIcon'
 import {
@@ -77,7 +77,7 @@ export default function HomeContent({
   const { user } = useAuthStore()
   const firstName = user?.name?.split(' ')[0]
   const platform = usePlatform()
-  const [interactions, setInteractions] = useState<Interaction[]>([])
+  const [interactions, setInteractions] = useState<InteractionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
   const [audioInstances, setAudioInstances] = useState<
@@ -177,7 +177,7 @@ export default function HomeContent({
 
   // Calculate statistics from interactions
   const calculateStats = useCallback(
-    (interactions: Interaction[]): InteractionStats => {
+    (interactions: InteractionSummary[]): InteractionStats => {
       if (interactions.length === 0) {
         return { streakDays: 0, totalWords: 0, averageWPM: 0 }
       }
@@ -196,11 +196,11 @@ export default function HomeContent({
     [],
   )
 
-  const calculateStreak = (interactions: Interaction[]): number => {
+  const calculateStreak = (interactions: InteractionSummary[]): number => {
     if (interactions.length === 0) return 0
 
     // Group interactions by date
-    const dateGroups = new Map<string, Interaction[]>()
+    const dateGroups = new Map<string, InteractionSummary[]>()
     interactions.forEach(interaction => {
       const date = new Date(interaction.created_at).toDateString()
       if (!dateGroups.has(date)) {
@@ -233,7 +233,7 @@ export default function HomeContent({
     return streak
   }
 
-  const calculateTotalWords = (interactions: Interaction[]): number => {
+  const calculateTotalWords = (interactions: InteractionSummary[]): number => {
     return interactions.reduce((total, interaction) => {
       const transcript = interaction.asr_output?.transcript?.trim()
       if (transcript) {
@@ -245,7 +245,7 @@ export default function HomeContent({
     }, 0)
   }
 
-  const calculateAverageWPM = (interactions: Interaction[]): number => {
+  const calculateAverageWPM = (interactions: InteractionSummary[]): number => {
     const validInteractions = interactions.filter(
       interaction =>
         interaction.asr_output?.transcript?.trim() && interaction.duration_ms,
@@ -292,7 +292,7 @@ export default function HomeContent({
 
       // Sort by creation date (newest first) - remove the slice(0, 10) to show all interactions
       const sortedInteractions = allInteractions.sort(
-        (a: Interaction, b: Interaction) =>
+        (a: InteractionSummary, b: InteractionSummary) =>
           new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )
       setInteractions(sortedInteractions)
@@ -372,8 +372,8 @@ export default function HomeContent({
       .toUpperCase()
   }
 
-  const groupInteractionsByDate = (interactions: Interaction[]) => {
-    const groups: { [key: string]: Interaction[] } = {}
+  const groupInteractionsByDate = (interactions: InteractionSummary[]) => {
+    const groups: { [key: string]: InteractionSummary[] } = {}
 
     interactions.forEach(interaction => {
       const dateKey = formatDate(interaction.created_at)
@@ -386,7 +386,7 @@ export default function HomeContent({
     return groups
   }
 
-  const getDisplayText = (interaction: Interaction) => {
+  const getDisplayText = (interaction: InteractionSummary) => {
     // Check for errors first
     if (interaction.asr_output?.error) {
       // Prefer precise error code mapping when available
@@ -435,7 +435,7 @@ export default function HomeContent({
     }
   }
 
-  const handleAudioPlayStop = async (interaction: Interaction) => {
+  const handleAudioPlayStop = async (interaction: InteractionSummary) => {
     try {
       // If this interaction is currently playing, stop it
       if (playingAudio === interaction.id) {
@@ -463,7 +463,7 @@ export default function HomeContent({
         }
       }
 
-      if (!interaction.raw_audio) {
+      if (!interaction.has_audio) {
         console.warn('No audio data available for this interaction')
         return
       }
@@ -475,7 +475,17 @@ export default function HomeContent({
       let audio = audioInstances.get(interaction.id)
 
       if (!audio) {
-        const pcmData = new Uint8Array(interaction.raw_audio)
+        // The list rows don't carry audio (it can be megabytes per row);
+        // fetch the full record on demand.
+        const fullInteraction = await window.api.interactions.getById(
+          interaction.id,
+        )
+        if (!fullInteraction?.raw_audio) {
+          console.warn('No audio data available for this interaction')
+          setPlayingAudio(null)
+          return
+        }
+        const pcmData = new Uint8Array(fullInteraction.raw_audio)
         try {
           // Convert raw PCM (mono, typically 16 kHz) to 48 kHz stereo WAV for smoother playback
           const wavBuffer = createStereo48kWavFromMonoPCM(
@@ -546,14 +556,23 @@ export default function HomeContent({
     }
   }
 
-  const handleAudioDownload = async (interaction: Interaction) => {
+  const handleAudioDownload = async (interaction: InteractionSummary) => {
     try {
-      if (!interaction.raw_audio) {
+      if (!interaction.has_audio) {
         console.warn('No audio data available for download')
         return
       }
 
-      const pcmData = new Uint8Array(interaction.raw_audio)
+      // Fetch the full record on demand — list rows don't carry audio.
+      const fullInteraction = await window.api.interactions.getById(
+        interaction.id,
+      )
+      if (!fullInteraction?.raw_audio) {
+        console.warn('No audio data available for download')
+        return
+      }
+
+      const pcmData = new Uint8Array(fullInteraction.raw_audio)
       // Convert raw PCM to WAV format
       const wavBuffer = createStereo48kWavFromMonoPCM(
         pcmData,
@@ -787,7 +806,7 @@ export default function HomeContent({
                           )}
 
                           {/* Download button */}
-                          {interaction.raw_audio && (
+                          {interaction.has_audio && (
                             <Tooltip
                               open={
                                 openTooltipKey === `download:${interaction.id}`
@@ -831,7 +850,7 @@ export default function HomeContent({
                                     : 'text-gray-600'
                                 }`}
                                 onClick={() => handleAudioPlayStop(interaction)}
-                                disabled={!interaction.raw_audio}
+                                disabled={!interaction.has_audio}
                               >
                                 {playingAudio === interaction.id ? (
                                   <Stop className="w-4 h-4" />
@@ -841,7 +860,7 @@ export default function HomeContent({
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="top" sideOffset={5}>
-                              {!interaction.raw_audio
+                              {!interaction.has_audio
                                 ? 'No audio available'
                                 : playingAudio === interaction.id
                                   ? 'Stop'
