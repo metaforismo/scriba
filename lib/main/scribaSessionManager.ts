@@ -7,7 +7,8 @@ import { TextInserter } from './text/TextInserter'
 import { interactionManager } from './interactions/InteractionManager'
 import { contextGrabber } from './context/ContextGrabber'
 import { GrammarRulesService } from './grammar/GrammarRulesService'
-import { getAdvancedSettings } from './store'
+import { getAdvancedSettings, getSnippets } from './store'
+import { expandSnippets } from '../utils/snippets'
 import log from 'electron-log'
 import { timingCollector, TimingEventName } from './timing/TimingCollector'
 
@@ -347,6 +348,13 @@ export class ScribaSessionManager {
           textToInsert = this.grammarRulesService.setCaseFirstWord(textToInsert)
           textToInsert =
             this.grammarRulesService.addLeadingSpaceIfNeeded(textToInsert)
+        }
+
+        // Expand voice text-expansion snippets (e.g. "my address" -> the full
+        // address) on the final text, verbatim, after grammar.
+        const snippets = getSnippets()
+        if (snippets.length > 0) {
+          textToInsert = expandSnippets(textToInsert, snippets)
         }
 
         // Await the insertion so an insert failure doesn't silently drop the
