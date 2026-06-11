@@ -113,6 +113,15 @@ export const TranscriptCleanupLevelSchema = z
 
 export type TranscriptCleanupLevel = z.infer<typeof TranscriptCleanupLevelSchema>
 
+// Transcription language: 'auto' (auto-detect) or an ISO-639-1 code (e.g. 'en',
+// 'es'). Never throws — anything unexpected degrades to 'auto'.
+export const TranscriptionLanguageSchema = z
+  .preprocess(
+    val => (typeof val === 'string' ? val.trim().toLowerCase() : val),
+    z.union([z.literal('auto'), z.string().regex(/^[a-z]{2}$/)]),
+  )
+  .catch('auto')
+
 // Header validation schema
 export const HeaderSchema = z.object({
   asrModel: AsrModelSchema.optional(),

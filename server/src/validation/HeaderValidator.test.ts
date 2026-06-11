@@ -172,6 +172,22 @@ describe('HeaderValidator', () => {
     })
   })
 
+  describe('validateLanguage', () => {
+    it('accepts auto and ISO-639-1 codes (case/space-insensitive)', () => {
+      expect(HeaderValidator.validateLanguage('auto')).toBe('auto')
+      expect(HeaderValidator.validateLanguage('en')).toBe('en')
+      expect(HeaderValidator.validateLanguage(' ES ')).toBe('es')
+    })
+
+    it('defaults to auto for invalid/missing values (never throws)', () => {
+      expect(HeaderValidator.validateLanguage('english')).toBe('auto')
+      expect(HeaderValidator.validateLanguage('e1')).toBe('auto')
+      expect(HeaderValidator.validateLanguage(null)).toBe('auto')
+      expect(HeaderValidator.validateLanguage(undefined)).toBe('auto')
+      expect(HeaderValidator.validateLanguage('')).toBe('auto')
+    })
+  })
+
   describe('validateAsrProvider', () => {
     it('should return valid ASR provider names', () => {
       expect(HeaderValidator.validateAsrProvider('groq')).toBe('groq')

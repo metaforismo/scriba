@@ -12,6 +12,7 @@ import {
   VocabularyArraySchema,
   TranscriptCleanupLevelSchema,
   type TranscriptCleanupLevel,
+  TranscriptionLanguageSchema,
 } from './schemas.js'
 
 /**
@@ -150,5 +151,13 @@ export class HeaderValidator {
     headerValue: string | null | undefined,
   ): TranscriptCleanupLevel {
     return TranscriptCleanupLevelSchema.parse(headerValue ?? undefined)
+  }
+
+  /**
+   * Resolves the transcription language from a header value: 'auto' or an
+   * ISO-639-1 code. Never throws — anything unexpected degrades to 'auto'.
+   */
+  static validateLanguage(headerValue: string | null | undefined): string {
+    return TranscriptionLanguageSchema.parse(headerValue ?? undefined)
   }
 }

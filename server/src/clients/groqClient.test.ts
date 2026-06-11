@@ -94,6 +94,34 @@ describe('GroqClient', () => {
       })
     })
 
+    it('forces the language when one is provided', async () => {
+      mockGroqClient.audio.transcriptions.create.mockResolvedValue({
+        text: 'Hola',
+      })
+      await groqClient.transcribeAudio(Buffer.from('audio'), {
+        fileType: 'wav',
+        asrModel: 'whisper-large-v3',
+        noSpeechThreshold: NO_SPEECH_THRESHOLD,
+        language: 'es',
+      })
+      expect(mockGroqClient.audio.transcriptions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ language: 'es' }),
+      )
+    })
+
+    it("does not pass a language for 'auto' (auto-detect)", async () => {
+      mockGroqClient.audio.transcriptions.create.mockResolvedValue({ text: 'hi' })
+      await groqClient.transcribeAudio(Buffer.from('audio'), {
+        fileType: 'wav',
+        asrModel: 'whisper-large-v3',
+        noSpeechThreshold: NO_SPEECH_THRESHOLD,
+        language: 'auto',
+      })
+      const callArg = (mockGroqClient.audio.transcriptions.create as any).mock
+        .calls[0][0]
+      expect('language' in callArg).toBe(false)
+    })
+
     it('should use default file type when not specified', async () => {
       const mockTranscription = { text: 'Test transcription' }
       mockGroqClient.audio.transcriptions.create.mockResolvedValue(

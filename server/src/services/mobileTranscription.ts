@@ -63,6 +63,9 @@ export const registerMobileTranscriptionRoutes = async (
         vocabulary: HeaderValidator.validateVocabularyArray(
           body.vocabulary ?? [],
         ),
+        language: HeaderValidator.validateLanguage(
+          request.headers['transcription-language'] as string | undefined,
+        ),
       })
 
       // Apply the same verbatim/light/heavy cleanup as the desktop streaming

@@ -73,6 +73,11 @@ export class TranscribeStreamV2Handler {
     const cleanupLevel = HeaderValidator.validateCleanupLevel(
       context?.requestHeader.get('transcript-cleanup-level'),
     )
+    // Forced transcription language ('auto' or an ISO-639-1 code), passed as a
+    // header so it needs no proto change.
+    const language = HeaderValidator.validateLanguage(
+      context?.requestHeader.get('transcription-language'),
+    )
 
     // Initialize timing collection
     serverTimingCollector.startInteraction(interactionId, userId)
@@ -117,7 +122,7 @@ export class TranscribeStreamV2Handler {
         : prepareAudioForTranscription(fullAudio)
 
       // Extract configuration
-      const asrConfig = this.extractAsrConfig(mergedConfig)
+      const asrConfig = { ...this.extractAsrConfig(mergedConfig), language }
 
       // Time transcription
       let transcript = await serverTimingCollector.timeAsync(
@@ -390,7 +395,7 @@ export class TranscribeStreamV2Handler {
 
   private async transcribeAudioData(
     audioWav: Buffer,
-    asrConfig: ReturnType<typeof this.extractAsrConfig>,
+    asrConfig: ReturnType<typeof this.extractAsrConfig> & { language?: string },
     context?: HandlerContext,
   ): Promise<string> {
     if (context?.signal.aborted) {
@@ -406,6 +411,7 @@ export class TranscribeStreamV2Handler {
       asrModel: asrConfig.asrModel,
       noSpeechThreshold: asrConfig.noSpeechThreshold,
       vocabulary: asrConfig.vocabulary,
+      language: asrConfig.language,
     })
 
     console.log(

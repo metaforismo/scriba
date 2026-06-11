@@ -116,6 +116,11 @@ class GroqClient implements LlmProvider {
     const vocabulary = options?.vocabulary
     const noSpeechThreshold =
       options?.noSpeechThreshold ?? DEFAULT_ADVANCED_SETTINGS.noSpeechThreshold
+    // Force a language only when explicitly set; otherwise Whisper auto-detects.
+    const language =
+      options?.language && options.language !== 'auto'
+        ? options.language
+        : undefined
 
     // Fail fast on configuration before doing any work.
     if (!this.isAvailable) {
@@ -143,6 +148,7 @@ class GroqClient implements LlmProvider {
         // The toFile helper correctly handles buffers for multipart/form-data uploads.
         // Providing a filename with the correct extension is crucial for the API.
         file,
+        ...(language ? { language } : {}),
         model: asrModel,
         prompt: transcriptionPrompt,
         response_format: 'verbose_json',
