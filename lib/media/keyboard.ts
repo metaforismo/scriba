@@ -2,7 +2,7 @@ import { spawn } from 'child_process'
 import store, { KeyboardShortcutConfig } from '../main/store'
 import { STORE_KEYS } from '../constants/store-keys'
 import { getNativeBinaryPath } from './native-interface'
-import { BrowserWindow } from 'electron'
+import { WebContents } from 'electron'
 import { scribaSessionManager } from '../main/scribaSessionManager'
 import { KeyName, keyNameMap, normalizeLegacyKey } from '../types/keyboard'
 
@@ -51,6 +51,9 @@ let pendingTapShortcutId: string | null = null
 const HOLD_THRESHOLD_MS = 250
 // A follow-up press within this of a quick-tap release counts as a double-tap.
 const DOUBLE_TAP_WINDOW_MS = 350
+// After a tap stops a hands-free session, ignore shortcut presses briefly so an
+// accidental double-tap on "stop" doesn't start a spurious ~350ms recording.
+let handsFreeStoppedAt: number | null = null
 
 function clearPendingTap() {
   if (pendingTapTimer) {
@@ -58,6 +61,43 @@ function clearPendingTap() {
     pendingTapTimer = null
   }
   pendingTapShortcutId = null
+}
+
+// --- Key-event forwarding to renderers ---
+// Raw global key events are only needed by the shortcut-editor UI while it is
+// capturing a new combo. Forward them only to webContents that subscribed (the
+// preload toggles this around `onKeyEvent`), so normally no keystroke data
+// crosses the IPC boundary and idle windows aren't woken twice per key press.
+const keyEventSubscribers = new Map<
+  number,
+  { webContents: WebContents; count: number }
+>()
+
+export function setKeyEventForwarding(
+  webContents: WebContents,
+  enabled: boolean,
+) {
+  const entry = keyEventSubscribers.get(webContents.id)
+  if (enabled) {
+    if (entry) {
+      entry.count++
+      return
+    }
+    keyEventSubscribers.set(webContents.id, { webContents, count: 1 })
+    webContents.once('destroyed', () =>
+      keyEventSubscribers.delete(webContents.id),
+    )
+  } else if (entry && --entry.count <= 0) {
+    keyEventSubscribers.delete(webContents.id)
+  }
+}
+
+function forwardKeyEventToSubscribers(event: KeyEvent) {
+  for (const { webContents } of keyEventSubscribers.values()) {
+    if (!webContents.isDestroyed()) {
+      webContents.send('key-event', event)
+    }
+  }
 }
 
 // Heartbeat monitoring state
@@ -74,7 +114,9 @@ export const resetForTesting = () => {
     dictationSuppressed = false
     handsFreeActive = false
     activationAt = 0
+    handsFreeStoppedAt = null
     clearPendingTap()
+    keyEventSubscribers.clear()
     pressedKeys.clear()
     keyPressTimestamps.clear()
     stopStuckKeyChecker()
@@ -220,12 +262,18 @@ function handleKeyEventInMain(event: KeyEvent) {
 
   if (!isShortcutGloballyEnabled) {
     // check to see if we should stop an in-progress recording (incl. hands-free)
-    if (activeShortcutId !== null || handsFreeActive || pendingTapTimer !== null) {
+    if (
+      activeShortcutId !== null ||
+      handsFreeActive ||
+      pendingTapTimer !== null
+    ) {
       activeShortcutId = null
       handsFreeActive = false
       clearPendingTap()
-      console.info('Shortcut DEACTIVATED, stopping recording...')
-      scribaSessionManager.completeSession()
+      // Disabling dictation is an abort: discard the audio rather than
+      // transcribing and typing text into whatever field happens to be focused.
+      console.info('Shortcut DEACTIVATED, cancelling recording...')
+      scribaSessionManager.cancelSession()
     }
     // Reset the pressed-key state so re-enabling shortcuts starts from a clean
     // slate; otherwise keys held while disabled stay "pressed" and corrupt the
@@ -233,6 +281,21 @@ function handleKeyEventInMain(event: KeyEvent) {
     pressedKeys.clear()
     keyPressTimestamps.clear()
     return
+  }
+
+  // Hands-free was toggled off while a tap was pending or a hands-free session
+  // was recording: nothing would ever stop that session through the (now
+  // disabled) hands-free paths below, so settle it here. The user spoke
+  // intentionally, so complete (transcribe) rather than cancel. If the keys are
+  // still held right after a double-tap, just downgrade to push-to-talk: the
+  // release branch will complete it normally.
+  if (!handsFreeEnabled && (handsFreeActive || pendingTapTimer !== null)) {
+    clearPendingTap()
+    handsFreeActive = false
+    if (activeShortcutId === null) {
+      console.info('lib Hands-free disabled mid-session, completing...')
+      scribaSessionManager.completeSession()
+    }
   }
 
   const normalizedKey = normalizeKey(event.key)
@@ -308,10 +371,17 @@ function handleKeyEventInMain(event: KeyEvent) {
         // A press while a hands-free session is recording STOPS it.
         if (handsFreeActive) {
           handsFreeActive = false
-          activeShortcutId = currentlyHeldShortcut.id
+          handsFreeStoppedAt = Date.now()
           console.info('lib Hands-free STOPPED by tap, completing...')
           scribaSessionManager.completeSession()
-          activeShortcutId = null
+          return
+        }
+        // An accidental second tap right after stopping hands-free would start
+        // a spurious sub-400ms recording; swallow it.
+        if (
+          handsFreeStoppedAt !== null &&
+          Date.now() - handsFreeStoppedAt < DOUBLE_TAP_WINDOW_MS
+        ) {
           return
         }
         if (pendingTapTimer !== null) {
@@ -443,12 +513,9 @@ export const startKeyListener = () => {
               // Process the event here in the main process for hotkey detection.
               handleKeyEventInMain(event)
 
-              // Broadcast the raw event to all renderer windows for UI updates.
-              BrowserWindow.getAllWindows().forEach(window => {
-                if (!window.webContents.isDestroyed()) {
-                  window.webContents.send('key-event', event)
-                }
-              })
+              // Forward the raw event only to renderers that subscribed
+              // (shortcut editors capturing a new combo).
+              forwardKeyEventToSubscribers(event)
             }
           } catch (e) {
             console.error('Failed to parse key process event:', line, e)
@@ -560,7 +627,10 @@ const getKeysToRegister = (shortcut?: KeyboardShortcutConfig): string[] => {
   }
 
   // Also block the special "fast fn" key if fn is part of the shortcut.
-  if (shortcut.keys.includes('fn')) {
+  // macOS only: code 179 is the fast-path fn key there, but on Windows it is
+  // the media Play/Pause key and must not be registered (the listener would
+  // swallow it).
+  if (process.platform === 'darwin' && shortcut.keys.includes('fn')) {
     keys.push('Unknown(179)')
   }
 
@@ -574,7 +644,11 @@ export const stopKeyListener = () => {
     // restart, or quit) so the key-up that would stop it will never arrive.
     // Cancel the orphaned session instead of leaving the recording stuck on.
     // Covers a hands-free session and a pending quick tap too.
-    if (activeShortcutId !== null || handsFreeActive || pendingTapTimer !== null) {
+    if (
+      activeShortcutId !== null ||
+      handsFreeActive ||
+      pendingTapTimer !== null
+    ) {
       console.warn(
         '[Key listener] Stopping with an active session; cancelling it to avoid an orphaned recording.',
       )

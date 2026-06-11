@@ -389,6 +389,9 @@ describe('AudioRecorderService', () => {
   describe('Volume Calculation Business Logic', () => {
     beforeEach(() => {
       audioRecorderService.initialize()
+      // Volume emissions are throttled (~15Hz); starting a recording resets the
+      // throttle so each test's first chunk emits immediately.
+      audioRecorderService.startRecording('test-device')
     })
 
     test('should calculate volume correctly for various inputs', async () => {
@@ -410,6 +413,9 @@ describe('AudioRecorderService', () => {
       await waitForProcessing()
 
       expect(volume!).toBe(0)
+
+      // Reset the volume throttle so the next chunk emits immediately.
+      audioRecorderService.startRecording('test-device')
 
       // Test maximum volume audio
       const maxAudio = Buffer.alloc(1024)

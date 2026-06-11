@@ -89,6 +89,18 @@ build_native_workspace() {
             # Cross-compile from macOS/Linux using GNU toolchain
             print_info "Cross-compiling with GNU toolchain..."
             cargo build --release --target x86_64-pc-windows-gnu
+
+            # electron-builder and the dev-mode binary resolver only look in
+            # the MSVC target dir (CI builds MSVC on Windows runners). Mirror
+            # the GNU output there so the local cross-compile flow produces a
+            # packageable layout too.
+            gnu_dir="target/x86_64-pc-windows-gnu/release"
+            msvc_dir="target/x86_64-pc-windows-msvc/release"
+            mkdir -p "$msvc_dir"
+            for exe in "$gnu_dir"/*.exe; do
+                [ -e "$exe" ] && cp -f "$exe" "$msvc_dir/"
+            done
+            print_info "Mirrored GNU-built .exe files into $msvc_dir for packaging"
         fi
     fi
 

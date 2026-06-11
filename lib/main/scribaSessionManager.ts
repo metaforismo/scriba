@@ -26,6 +26,32 @@ export class ScribaSessionManager {
   // await this so a fast key-up can't tear down a session whose start hasn't yet
   // assigned `streamResponsePromise` (which would otherwise orphan the recording).
   private startPromise: Promise<void> | null = null
+  // Resolves when an in-flight stop has finished tearing down the shared
+  // controller/recorder (NOT when the whole stop — which also waits on the
+  // server response — is done). startSession waits on this, so a stop and a
+  // start issued in the same tick (e.g. a pending tap interrupted by a new
+  // shortcut) can't interleave initialize() with the previous teardown.
+  private stopTeardownPromise: Promise<void> | null = null
+
+  /**
+   * Marks a stop's teardown phase as in flight. Must be called synchronously at
+   * the top of cancel/complete so a startSession issued in the same tick sees
+   * it. Returns a release function that is idempotent and only clears the
+   * shared slot if it still belongs to this stop.
+   */
+  private beginStopTeardown(): () => void {
+    let release: () => void = () => {}
+    const teardownPromise = new Promise<void>(resolve => {
+      release = resolve
+    })
+    this.stopTeardownPromise = teardownPromise
+    return () => {
+      if (this.stopTeardownPromise === teardownPromise) {
+        this.stopTeardownPromise = null
+      }
+      release()
+    }
+  }
 
   public async startSession(mode: ScribaMode) {
     // Re-entrancy guard: ignore overlapping start requests (a rapid hotkey
@@ -48,6 +74,13 @@ export class ScribaSessionManager {
       releaseStart = resolve
     })
     try {
+      // If the previous session's stop is still tearing down the shared
+      // controller/recorder, wait for it — otherwise initialize() would reset
+      // state the teardown is still reading (e.g. the audio duration check).
+      if (this.stopTeardownPromise) {
+        await this.stopTeardownPromise
+      }
+
       console.log('[scribaSessionManager] Starting session with mode:', mode)
 
       // Reuse existing global interaction ID if present, otherwise create a new one
@@ -168,50 +201,68 @@ export class ScribaSessionManager {
   }
 
   public async cancelSession() {
-    // Let any in-flight start finish first, so we don't capture a null
-    // streamResponsePromise and silently leave the recording running.
-    await this.waitForStartToSettle()
+    const finishTeardown = this.beginStopTeardown()
+    try {
+      // Let any in-flight start finish first, so we don't capture a null
+      // streamResponsePromise and silently leave the recording running.
+      await this.waitForStartToSettle()
 
-    // Capture the promise in a local variable immediately so new sessions can start
-    const responsePromise = this.streamResponsePromise
-    this.streamResponsePromise = null
+      // Capture the promise in a local variable immediately so new sessions can start
+      const responsePromise = this.streamResponsePromise
+      this.streamResponsePromise = null
 
-    // If another stop (a completeSession, or a duplicate cancel) already took
-    // ownership of this session, do nothing. Re-running teardown here could
-    // cancel an in-flight transcription that completeSession is about to handle
-    // (dropping a valid transcript) or double-stop the recorder.
-    if (!responsePromise) {
-      console.log(
-        '[scribaSessionManager] cancelSession ignored: no active session to cancel',
-      )
-      return
-    }
+      // If another stop (a completeSession, or a duplicate cancel) already took
+      // ownership of this session, do nothing. Re-running teardown here could
+      // cancel an in-flight transcription that completeSession is about to handle
+      // (dropping a valid transcript) or double-stop the recorder.
+      if (!responsePromise) {
+        console.log(
+          '[scribaSessionManager] cancelSession ignored: no active session to cancel',
+        )
+        return
+      }
 
-    // Clear timing for the interaction on cancel
-    timingCollector.clearInteraction()
+      // Clear timing for the interaction on cancel
+      timingCollector.clearInteraction()
 
-    // Cancel the transcription (will not create interaction)
-    scribaStreamController.cancelTranscription()
-    interactionManager.clearCurrentInteraction()
+      // Cancel the transcription (will not create interaction)
+      scribaStreamController.cancelTranscription()
+      interactionManager.clearCurrentInteraction()
 
-    // Stop audio recording
-    await voiceInputService.stopAudioRecording()
+      // Stop audio recording
+      await voiceInputService.stopAudioRecording()
 
-    // Update UI state
-    recordingStateNotifier.notifyRecordingStopped()
+      // Update UI state
+      recordingStateNotifier.notifyRecordingStopped()
 
-    // Wait for the stream promise to reject with cancellation error
-    if (responsePromise) {
+      // Shared resources are released; only the stream rejection remains.
+      finishTeardown()
+
+      // Wait for the stream promise to reject with cancellation error
       try {
         await responsePromise
       } catch (error) {
         // Expected cancellation error, log and ignore
-        console.log('[scribaSessionManager] Stream cancelled as expected:', error)
+        console.log(
+          '[scribaSessionManager] Stream cancelled as expected:',
+          error,
+        )
       }
+    } finally {
+      finishTeardown()
     }
   }
 
   public async completeSession() {
+    const finishTeardown = this.beginStopTeardown()
+    try {
+      await this.completeSessionInner(finishTeardown)
+    } finally {
+      finishTeardown()
+    }
+  }
+
+  private async completeSessionInner(finishTeardown: () => void) {
     // Let any in-flight start finish first, so we observe the streamResponsePromise
     // it assigns instead of capturing null and dropping the dictation.
     await this.waitForStartToSettle()
@@ -245,18 +296,17 @@ export class ScribaSessionManager {
       )
       scribaStreamController.cancelTranscription()
       recordingStateNotifier.notifyRecordingStopped()
+      finishTeardown()
 
       // Wait for the stream promise to reject with cancellation error
-      if (responsePromise) {
-        try {
-          await responsePromise
-        } catch (error) {
-          // Expected cancellation error, log and ignore
-          console.log(
-            '[scribaSessionManager] Stream cancelled as expected:',
-            error,
-          )
-        }
+      try {
+        await responsePromise
+      } catch (error) {
+        // Expected cancellation error, log and ignore
+        console.log(
+          '[scribaSessionManager] Stream cancelled as expected:',
+          error,
+        )
       }
       return
     }
@@ -269,6 +319,10 @@ export class ScribaSessionManager {
 
     // Notify processing started
     recordingStateNotifier.notifyProcessingStarted()
+
+    // Shared recorder/controller teardown is done; the remaining work only
+    // waits on the server response, which may overlap a new session.
+    finishTeardown()
 
     // Wait for the stream response and handle it
     if (responsePromise) {
@@ -315,7 +369,9 @@ export class ScribaSessionManager {
         recordingStateNotifier.notifyProcessingStopped()
       }
     } else {
-      console.warn('[scribaSessionManager] No stream response promise to wait for')
+      console.warn(
+        '[scribaSessionManager] No stream response promise to wait for',
+      )
       recordingStateNotifier.notifyProcessingStopped()
     }
   }
@@ -373,7 +429,9 @@ export class ScribaSessionManager {
         if (!inserted) {
           try {
             clipboard.writeText(textToInsert)
-            recordingStateNotifier.notifyError('Insert failed — copied to clipboard')
+            recordingStateNotifier.notifyError(
+              'Insert failed — copied to clipboard',
+            )
           } catch (clipboardError) {
             log.error(
               '[scribaSessionManager] Clipboard fallback failed:',
@@ -419,7 +477,10 @@ export class ScribaSessionManager {
   }
 
   /** Maps a server-returned protobuf ClientError to a short user-facing message. */
-  private friendlyResponseError(error: { code?: string; message?: string }): string {
+  private friendlyResponseError(error: {
+    code?: string
+    message?: string
+  }): string {
     switch (error?.code) {
       case 'CLIENT_NO_SPEECH_DETECTED':
         return 'No speech detected'

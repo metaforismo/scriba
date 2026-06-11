@@ -120,7 +120,9 @@ mock.module('./grammar/GrammarRulesService', () => ({
 const mockGetAdvancedSettings = mock(() => ({
   grammarServiceEnabled: false,
 }))
-const mockGetSnippets = mock((): Array<{ trigger: string; expansion: string }> => [])
+const mockGetSnippets = mock(
+  (): Array<{ trigger: string; expansion: string }> => [],
+)
 mock.module('./store', () => ({
   getAdvancedSettings: mockGetAdvancedSettings,
   getSnippets: mockGetSnippets,
@@ -151,7 +153,9 @@ describe('scribaSessionManager', () => {
     Object.values(mockRecordingStateNotifier).forEach(mockFn =>
       mockFn.mockClear(),
     )
-    Object.values(mockScribaStreamController).forEach(mockFn => mockFn.mockClear())
+    Object.values(mockScribaStreamController).forEach(mockFn =>
+      mockFn.mockClear(),
+    )
     Object.values(mockTextInserter).forEach(mockFn => mockFn.mockClear())
     Object.values(mockInteractionManager).forEach(mockFn => mockFn.mockClear())
     Object.values(mockContextGrabber).forEach(mockFn => mockFn.mockClear())
@@ -224,6 +228,52 @@ describe('scribaSessionManager', () => {
     ).toHaveBeenCalledTimes(1)
   })
 
+  test('startSession waits for an in-flight stop teardown (stop→start same tick)', async () => {
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    // Session A is running.
+    await session.startSession(ScribaMode.TRANSCRIBE)
+
+    const order: string[] = []
+    let releaseTeardown: () => void = () => {}
+    mockVoiceInputService.stopAudioRecording.mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          releaseTeardown = () => {
+            order.push('teardown-finished')
+            resolve()
+          }
+        }),
+    )
+    mockScribaStreamController.initialize.mockImplementation(() => {
+      order.push('initialize-B')
+      return Promise.resolve(true)
+    })
+
+    // Same-tick stop + start, as when a pending tap is interrupted by a new
+    // shortcut: B must not initialize while A is still tearing down.
+    const completePromise = session.completeSession()
+    const startPromise = session.startSession(ScribaMode.EDIT)
+
+    // Flush microtasks: B should still be parked behind A's teardown.
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+    expect(order).not.toContain('initialize-B')
+
+    releaseTeardown()
+    await Promise.all([completePromise, startPromise])
+
+    expect(order.indexOf('teardown-finished')).toBeLessThan(
+      order.indexOf('initialize-B'),
+    )
+
+    // Restore the default implementation for subsequent tests (mockClear in
+    // beforeEach does not undo mockImplementation).
+    mockVoiceInputService.stopAudioRecording.mockImplementation(() =>
+      Promise.resolve(),
+    )
+  })
+
   test('should fetch and send context in background', async () => {
     const { ScribaSessionManager } = await import('./scribaSessionManager')
     const session = new ScribaSessionManager()
@@ -294,7 +344,9 @@ describe('scribaSessionManager', () => {
 
     await session.setMode(ScribaMode.EDIT)
 
-    expect(mockScribaStreamController.setMode).toHaveBeenCalledWith(ScribaMode.EDIT)
+    expect(mockScribaStreamController.setMode).toHaveBeenCalledWith(
+      ScribaMode.EDIT,
+    )
     expect(
       mockRecordingStateNotifier.notifyRecordingStarted,
     ).toHaveBeenCalledWith(ScribaMode.EDIT)
@@ -327,7 +379,9 @@ describe('scribaSessionManager', () => {
     await modeP
 
     // Once streaming, the EDIT switch goes through.
-    expect(mockScribaStreamController.setMode).toHaveBeenCalledWith(ScribaMode.EDIT)
+    expect(mockScribaStreamController.setMode).toHaveBeenCalledWith(
+      ScribaMode.EDIT,
+    )
   })
 
   test('re-fetches context when switching into EDIT mode mid-session', async () => {
@@ -393,7 +447,9 @@ describe('scribaSessionManager', () => {
     await session.cancelSession()
     await completing
 
-    expect(mockScribaStreamController.cancelTranscription).not.toHaveBeenCalled()
+    expect(
+      mockScribaStreamController.cancelTranscription,
+    ).not.toHaveBeenCalled()
     expect(mockTextInserter.insertText).toHaveBeenCalledWith(mockTranscript)
   })
 
@@ -788,7 +844,9 @@ describe('scribaSessionManager', () => {
 
     // The cancel observed the in-flight session and aborted it rather than
     // no-opping and leaving the recording running.
-    expect(mockScribaStreamController.cancelTranscription).toHaveBeenCalledTimes(1)
+    expect(
+      mockScribaStreamController.cancelTranscription,
+    ).toHaveBeenCalledTimes(1)
     expect(mockVoiceInputService.stopAudioRecording).toHaveBeenCalled()
   })
 })

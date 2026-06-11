@@ -19,9 +19,15 @@ pub fn get_selected_text() -> Result<String, Box<dyn std::error::Error>> {
 pub fn copy_selected_text() -> Result<(), Box<dyn std::error::Error>> {
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
+    // VK_C (0x43) rather than Key::Unicode('c'): Unicode resolves through the
+    // active keyboard layout, and on layouts without a 'c' key enigo falls
+    // back to sending text — the Ctrl+C chord never happens and the copy
+    // silently fails.
+    const VK_C: u32 = 0x43;
+
     let mut enigo = Enigo::new(&Settings::default())?;
     enigo.key(Key::Control, Direction::Press)?;
-    enigo.key(Key::Unicode('c'), Direction::Click)?;
+    enigo.key(Key::Other(VK_C), Direction::Click)?;
     enigo.key(Key::Control, Direction::Release)?;
 
     Ok(())

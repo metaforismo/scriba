@@ -33,7 +33,15 @@ export async function checkMicrophonePermission(
     return systemPreferences.getMediaAccessStatus('microphone') === 'granted'
   }
 
-  // Windows - microphone permissions are handled by the OS
-  // and don't require explicit permission checks in Electron apps
+  if (process.platform === 'win32') {
+    // Windows can't prompt programmatically, but getMediaAccessStatus reflects
+    // the Settings → Privacy → Microphone toggle. Without this check a denied
+    // mic silently records nothing. 'not-determined' counts as granted because
+    // Windows only reports 'denied' once the user has actively disabled it.
+    const status = systemPreferences.getMediaAccessStatus('microphone')
+    return status === 'granted' || status === 'not-determined'
+  }
+
+  // Linux: no permission API; assume granted.
   return true
 }

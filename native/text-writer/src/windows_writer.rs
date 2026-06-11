@@ -8,9 +8,6 @@ use std::time::Duration;
 /// This mimics the macOS implementation to avoid character-by-character typing
 /// issues
 pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
-    // Store current clipboard contents to restore later
-    let old_contents: Result<String, _> = get_clipboard(formats::Unicode);
-
     // Set our text to clipboard
     set_clipboard(formats::Unicode, text)
         .map_err(|e| format!("Failed to set clipboard: {:?}", e))?;
@@ -34,7 +31,14 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
     let mut enigo = Enigo::new(&Settings::default())
         .map_err(|e| format!("Failed to initialize enigo: {}", e))?;
 
-    // Simulate Ctrl+V (paste)
+    // Simulate Ctrl+V (paste).
+    // Use the virtual-key code (VK_V = 0x56) rather than Key::Unicode('v'):
+    // Unicode resolves via the active keyboard layout (VkKeyScanW), and on
+    // layouts with no 'v' key (Cyrillic, Greek, ...) enigo falls back to
+    // sending plain text — no Ctrl+V chord is ever delivered and the paste
+    // silently never happens.
+    const VK_V: u32 = 0x56;
+
     // Press Ctrl
     enigo
         .key(Key::Control, enigo::Direction::Press)
@@ -42,7 +46,7 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
 
     // Press V
     enigo
-        .key(Key::Unicode('v'), enigo::Direction::Press)
+        .key(Key::Other(VK_V), enigo::Direction::Press)
         .map_err(|e| format!("Failed to press V: {}", e))?;
 
     // Small delay to ensure the key press is registered
@@ -50,7 +54,7 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
 
     // Release V
     enigo
-        .key(Key::Unicode('v'), enigo::Direction::Release)
+        .key(Key::Other(VK_V), enigo::Direction::Release)
         .map_err(|e| format!("Failed to release V: {}", e))?;
 
     // Release Ctrl
@@ -58,10 +62,9 @@ pub fn type_text_windows(text: &str, _char_delay: u64) -> Result<(), String> {
         .key(Key::Control, enigo::Direction::Release)
         .map_err(|e| format!("Failed to release Ctrl: {}", e))?;
 
-    if let Ok(old_text) = old_contents {
-        thread::sleep(Duration::from_secs(1));
-        let _ = set_clipboard(formats::Unicode, &old_text);
-    }
+    // Clipboard restore is handled by the Electron main process: this
+    // one-shot binary must exit promptly, so it cannot wait ~1s for the
+    // target app to consume the paste before restoring.
 
     Ok(())
 }

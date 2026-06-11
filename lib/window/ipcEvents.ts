@@ -17,6 +17,7 @@ import {
   KeyListenerProcess,
   stopKeyListener,
   registerAllHotkeys,
+  setKeyEventForwarding,
 } from '../media/keyboard'
 import { getPillWindow, mainWindow } from '../main/app'
 import {
@@ -142,6 +143,9 @@ export function registerIPC() {
   })
   handleIPC('stop-key-listener', () => stopKeyListener())
   handleIPC('register-hotkeys', () => registerAllHotkeys())
+  handleIPC('set-key-event-forwarding', (e, enabled: boolean) =>
+    setKeyEventForwarding(e.sender, enabled),
+  )
   handleIPC('start-native-recording-service', () =>
     scribaSessionManager.startSession(ScribaMode.TRANSCRIBE),
   )
@@ -443,7 +447,9 @@ export function registerIPC() {
   handleIPC(
     'billing:confirm-session',
     async (_e, { sessionId }: { sessionId: string }) => {
-      return scribaHttpClient.post('/billing/confirm', { session_id: sessionId })
+      return scribaHttpClient.post('/billing/confirm', {
+        session_id: sessionId,
+      })
     },
   )
 
@@ -581,7 +587,7 @@ export function registerIPC() {
   // Interactions
   handleIPC('interactions:get-all', () => {
     const user_id = getCurrentUserId()
-    return InteractionsTable.findAll(user_id)
+    return InteractionsTable.findAllSummaries(user_id)
   })
   handleIPC('interactions:get-by-id', async (_e, id) =>
     InteractionsTable.findById(id),
