@@ -49,6 +49,7 @@ targets:
       - Shared/WAVEncoder.swift
       - Shared/FormURLEncoding.swift
       - Scriba/Auth/PKCE.swift
+      - Scriba/Auth/OAuthCallback.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.scriba.app.tests
