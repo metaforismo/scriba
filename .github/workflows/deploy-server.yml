@@ -14,12 +14,12 @@ jobs:
       server_changed: ${{ steps.filter.outputs.server }}
       infra_changed: ${{ steps.filter.outputs.infra }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # Fetch full history to allow comparing against previous commits
       - name: Detect changed areas
         id: filter
-        uses: dorny/paths-filter@v2
+        uses: dorny/paths-filter@v3
         with:
           base: ${{ github.event.before }}
           filters: |
