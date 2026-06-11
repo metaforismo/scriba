@@ -42,6 +42,14 @@ final class KeyboardViewController: UIInputViewController {
         view.addSubview(host.view)
         host.didMove(toParent: self)
 
+        // Custom keyboards default to the system keyboard height, which can clip
+        // taller content (e.g. the numeric-field number pad). Request an explicit
+        // height that fits all field modes. High (not required) priority so it
+        // never conflicts with the system's keyboard layout constraints.
+        let heightConstraint = view.heightAnchor.constraint(equalToConstant: 280)
+        heightConstraint.priority = .defaultHigh
+        heightConstraint.isActive = true
+
         NSLayoutConstraint.activate([
             host.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             host.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
