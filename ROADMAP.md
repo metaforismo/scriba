@@ -96,6 +96,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 48 — 2026-06-11 (iOS audio interruption handling) — PR #17
+- **Researched** real Wispr complaints (firecrawl): an App Store review — "keeps losing my transcription on long-form, especially with AirPods" — pointed at unhandled **audio-session interruptions / route changes**.
+- **Fix (iOS):** `AudioRecorder` now observes `AVAudioSession` interruption (`.began`) and route-change (`.oldDeviceUnavailable`, e.g. AirPods removed) notifications → `onInterrupted`; `DictationController` **finalizes the in-progress recording** so the audio captured before the interruption is transcribed instead of silently dropped. Build-verified; 26 iOS tests still pass. PR #17 → merged.
+- **Also confirmed:** Scriba's cleanup prompts already handle **self-corrections** (light + heavy) — Wispr parity, no change needed.
+- **Next:** more research-driven, testable/runtime-verified work.
+
 ### Iteration 47 — 2026-06-11 (app-aware cleanup formatting — Wispr parity)
 - **Researched** Wispr Flow afresh (firecrawl): confirmed its **context-aware formatting** — it "adapts tone and formatting for email, texting, and more" based on which app you're in.
 - **Feat (server):** Scriba already gathered the active app name but only used it for EDIT — the TRANSCRIBE **cleanup ignored it**. Now `cleanupTranscript` takes the app name (from `windowContext.appName` in the V2 handler) and, via a new pure `buildCleanupUserPrompt()`, tells the LLM to format appropriately for that medium (structured for email, concise for chat) while preserving wording/meaning/names/dates/numbers. No app context (e.g. mobile) → unchanged. +4 tests; server suite green.
