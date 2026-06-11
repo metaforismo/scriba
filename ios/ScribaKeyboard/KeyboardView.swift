@@ -6,7 +6,9 @@ import UIKit
 /// / return). Text insertion itself is handled by the host view controller.
 struct KeyboardView: View {
     @ObservedObject var dictation: DictationController
-    @ObservedObject var recorder: AudioRecorder
+    // Deliberately NOT @ObservedObject: the recorder publishes the input level
+    // many times a second, and only the Waveform child should re-render for it.
+    let recorder: AudioRecorder
     @ObservedObject var context: KeyboardContext
     @ObservedObject var live: LiveTranscriber
 
@@ -105,7 +107,7 @@ struct KeyboardView: View {
                 // (head-truncated so the latest words stay visible); fall back to
                 // the waveform until the first words arrive.
                 if live.interim.isEmpty {
-                    Waveform(level: recorder.level)
+                    Waveform(recorder: recorder)
                 } else {
                     Text(live.interim)
                         .foregroundColor(.white)
@@ -204,9 +206,12 @@ struct KeyboardView: View {
     }
 }
 
-/// A lightweight bar waveform driven by the recorder's normalized level.
+/// A lightweight bar waveform driven by the recorder's normalized level. It
+/// observes the recorder itself so each level tick re-renders only these bars,
+/// not the whole keyboard.
 private struct Waveform: View {
-    var level: Float
+    @ObservedObject var recorder: AudioRecorder
+    private var level: Float { recorder.level }
     private let bars = 13
 
     var body: some View {

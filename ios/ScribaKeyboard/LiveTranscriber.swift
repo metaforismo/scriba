@@ -46,10 +46,14 @@ final class LiveTranscriber: ObservableObject {
         lock.withLock { self.request = request }
 
         task = recognizer.recognitionTask(with: request) { [weak self] result, _ in
-            guard let text = result?.bestTranscription.formattedString else {
-                return
-            }
-            self?.publish(text)
+            guard let self,
+                let text = result?.bestTranscription.formattedString,
+                // A late result can arrive after `stop()` (or after a new session
+                // started); only the current request may publish, so a stale one
+                // can't resurrect old interim text.
+                self.lock.withLock({ self.request === request })
+            else { return }
+            self.publish(text)
         }
     }
 

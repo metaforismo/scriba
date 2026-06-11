@@ -34,6 +34,10 @@ final class DictationController: ObservableObject {
     // and install a second audio tap (an uncatchable crash).
     private var isStarting = false
 
+    // Bumped by `cancel()` so an in-flight start or transcription that crosses a
+    // cancellation (keyboard dismissed mid-dictation) discards its result.
+    private var generation = 0
+
     init() {
         // If the system cuts the recording short (call, another app, AirPods
         // removed), finalize what we captured rather than losing it.
@@ -83,8 +87,15 @@ final class DictationController: ObservableObject {
         if isStarting || state == .recording { return }
         isStarting = true
         defer { isStarting = false }
+        let gen = generation
         do {
             try await recorder.start()
+            // Cancelled (keyboard dismissed) while the recorder was starting —
+            // don't leave the mic hot.
+            guard gen == generation else {
+                _ = recorder.stop()
+                return
+            }
             live.start() // live preview; no-op if speech permission isn't granted
             state = .recording
         } catch AudioRecorder.RecorderError.microphoneDenied {
@@ -95,6 +106,12 @@ final class DictationController: ObservableObject {
     }
 
     private func finishRecording() async {
+        // Idempotency: two stop paths can race (double tap on stop, an
+        // interruption firing alongside a route change, an interruption racing a
+        // user stop). We're @MainActor with no suspension point before the state
+        // flips below, so this guard serializes them — only the first proceeds.
+        guard state == .recording else { return }
+        let gen = generation
         live.stop()
         let audio = recorder.stop()
         // A header-only WAV (no captured samples) isn't worth a round-trip — it'd
@@ -106,14 +123,28 @@ final class DictationController: ObservableObject {
         state = .transcribing
         do {
             let transcript = try await TranscriptionClient().transcribe(audio: audio)
+            guard gen == generation else { return } // cancelled mid-transcription
             let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmed.isEmpty { onTranscript?(transcript) }
             state = .idle
         } catch let error as TranscriptionError {
+            guard gen == generation else { return }
             setError(error.errorDescription ?? "Transcription failed")
         } catch {
+            guard gen == generation else { return }
             setError("Transcription failed")
         }
+    }
+
+    /// Aborts any in-flight dictation (e.g. the keyboard is being dismissed):
+    /// stops the recorder so the mic doesn't stay hot, ends the live preview, and
+    /// discards any pending transcript instead of inserting it later.
+    func cancel() {
+        generation += 1
+        guard state != .idle else { return }
+        live.stop()
+        if state == .recording { _ = recorder.stop() }
+        state = .idle
     }
 
     /// Resets a transient error back to idle (e.g. after showing it briefly).

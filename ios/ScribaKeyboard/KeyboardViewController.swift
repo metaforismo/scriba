@@ -67,6 +67,14 @@ final class KeyboardViewController: UIInputViewController {
         context.update(from: textDocumentProxy)
     }
 
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        // The keyboard is going away mid-dictation: stop the mic (otherwise the
+        // audio engine keeps it hot), end the live preview, and drop any pending
+        // transcript so it isn't inserted into whatever field comes next.
+        dictation.cancel()
+    }
+
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         // The host field (and its keyboard type / secure flag) can change as the
