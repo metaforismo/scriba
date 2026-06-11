@@ -96,6 +96,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 38 — 2026-06-11 (iOS auth form-encoding tested) — PR #11
+- **Refactor + tests (iOS, auth correctness):** extracted the Auth0 `application/x-www-form-urlencoded` body building out of `TokenRefresher` into a pure `Shared/FormURLEncoding.swift`; +4 tests. Refresh tokens / auth codes are base64 and routinely contain `+ / =` — if those aren't percent-encoded the refresh POST corrupts the token and silently breaks re-auth, so this pins it down. **17 iOS tests total, TEST SUCCEEDED.** PR #11 → merged.
+- **Reviewed** TokenStore (correct: shared keychain via the first access group, both entitlements list `<prefix>.ai.scriba.shared`) and TokenRefresher. **Deferred (hygiene, low realistic risk + untestable here):** coalesce concurrent `TokenRefresher.refresh()` calls (rotation-safety) — the keyboard serializes dictations so in-process races are unlikely.
+- **iOS tests: smart-spacing, WAV, PKCE, form-encoding (17).**
+- **Next:** more testable iOS/desktop/server work.
+
 ### Iteration 37 — 2026-06-11 (iOS PKCE auth crypto tested) — PR #10
 - **Test (iOS, security):** extracted a pure `PKCE.challenge(for:)` (S256) and verified it against **RFC 7636 Appendix B's published vector** — a wrong code challenge would make Auth0 reject every login, so this pins the auth crypto down. Also covers base64url-without-padding + generated-pair consistency. **13 iOS tests total, TEST SUCCEEDED.** PR #10 → merged. (GitHub API had a transient outage mid-iteration; retried PR create until it recovered.)
 - **iOS test coverage so far:** smart-spacing, WAV encoder, PKCE challenge.
