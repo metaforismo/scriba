@@ -6,6 +6,7 @@ type SettingsPageType =
   | 'general'
   | 'keyboard'
   | 'audio'
+  | 'snippets'
   | 'account'
   | 'advanced'
   | 'pricing-billing'

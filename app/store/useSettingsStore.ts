@@ -6,6 +6,7 @@ import {
 } from '@/app/components/analytics'
 import { STORE_KEYS } from '../../lib/constants/store-keys'
 import type { KeyboardShortcutConfig } from '@/lib/main/store'
+import type { Snippet } from '@/lib/utils/snippets'
 import { ScribaMode } from '../generated/scriba_pb'
 
 import { SCRIBA_MODE_SHORTCUT_DEFAULTS } from '@/lib/constants/keyboard-defaults'
@@ -27,6 +28,8 @@ interface SettingsState {
   microphoneDeviceId: string
   microphoneName: string
   keyboardShortcuts: KeyboardShortcutConfig[]
+  snippets: Snippet[]
+  setSnippets: (snippets: Snippet[]) => void
   setShareAnalytics: (share: boolean) => void
   setLaunchAtLogin: (launch: boolean) => void
   setShowScribaBarAlways: (show: boolean) => void
@@ -70,6 +73,7 @@ const getInitialState = () => {
         id: crypto.randomUUID(),
       },
     ],
+    snippets: storedSettings?.snippets ?? [],
     firstName: storedSettings?.firstName ?? '',
     lastName: storedSettings?.lastName ?? '',
     email: storedSettings?.email ?? '',
@@ -172,6 +176,13 @@ export const useSettingsStore = create<SettingsState>(set => {
       'muteAudioWhenDictating',
       'audio&mic',
     ),
+    // Custom (not createSetter) so snippet content — which can hold personal text
+    // like addresses — is never sent to analytics.
+    setSnippets: (snippets: Snippet[]) => {
+      const partialState = { snippets }
+      set(partialState)
+      syncToStore(partialState)
+    },
     setMicrophoneDeviceId: (deviceId: string, name: string) => {
       const currentName = useSettingsStore.getState().microphoneName
       analytics.trackSettings(ANALYTICS_EVENTS.MICROPHONE_CHANGED, {
