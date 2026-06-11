@@ -34,6 +34,22 @@ targets:
         INFOPLIST_FILE: Scriba/Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Scriba/Resources/Scriba.entitlements
         GENERATE_INFOPLIST_FILE: "NO"
+    scheme:
+      testTargets:
+        - ScribaTests
+
+  # Host-less logic tests for the pure, dependency-free helpers. Compiles the
+  # sources under test directly so it needs no app host.
+  ScribaTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+      - Shared/TextInsertion.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.scriba.app.tests
+        GENERATE_INFOPLIST_FILE: "YES"
 
   ScribaKeyboard:
     type: app-extension
