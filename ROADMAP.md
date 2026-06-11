@@ -96,6 +96,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 36 — 2026-06-11
+- **Fix (server, real bug):** `/v1/transcribe` (the iOS keyboard's endpoint) had **no per-route `bodyLimit`**, so Fastify's **1 MB default** rejected any dictation over ~20 s (>1 MB base64) with a generic 413 *before* the handler ran — making the handler's 25 MB audio cap dead code. Added a per-route `bodyLimit` sized to the audio cap + base64/JSON overhead, so the handler's cap is the real gate. +1 test (a >1 MB body now reaches the handler). 8/8 mobile tests pass; type-check clean.
+- **Next:** more testable desktop/server fixes or build/test-verified iOS work.
+
 ### Iteration 35 — 2026-06-11 (iOS WAV encoder → tested unit) — PR #9
 - **Refactor + tests (iOS):** extracted the WAV (RIFF) container logic out of `AudioRecorder` (AVFoundation-bound, untestable in the host-less target) into pure `Shared/WAVEncoder.swift`; `AudioRecorder.stop()` calls `WAVEncoder.encode()`. +3 tests (header layout, little-endian sample round-trip incl. Int16 extremes, empty-samples). **9 iOS tests total, TEST SUCCEEDED.** PR #9 → merged.
 - **Next:** continue extracting/test-covering iOS pure logic, or testable desktop/server items.
