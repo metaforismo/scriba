@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 /// Orchestrates a single dictation: record → transcribe → hand the text back to
 /// the keyboard for insertion. Owns the recorder and exposes a simple state
@@ -19,6 +20,17 @@ final class DictationController: ObservableObject {
     /// Called with the final transcript so the host can insert it.
     var onTranscript: ((String) -> Void)?
 
+    // Tactile feedback, à la Wispr Flow (works because the keyboard requires Full
+    // Access). Impact on start/stop taps; an error notification when a dictation
+    // fails.
+    private let impact = UIImpactFeedbackGenerator(style: .medium)
+    private let notify = UINotificationFeedbackGenerator()
+
+    private func setError(_ message: String) {
+        notify.notificationOccurred(.error)
+        state = .error(message)
+    }
+
     var isBusy: Bool {
         switch state {
         case .recording, .transcribing: return true
@@ -29,8 +41,10 @@ final class DictationController: ObservableObject {
     func toggle() {
         switch state {
         case .idle, .error:
+            impact.impactOccurred()
             Task { await startRecording() }
         case .recording:
+            impact.impactOccurred()
             Task { await finishRecording() }
         case .transcribing:
             break // ignore taps while transcribing
@@ -42,9 +56,9 @@ final class DictationController: ObservableObject {
             try await recorder.start()
             state = .recording
         } catch AudioRecorder.RecorderError.microphoneDenied {
-            state = .error("Enable microphone access in Settings")
+            setError("Enable microphone access in Settings")
         } catch {
-            state = .error("Couldn't start recording")
+            setError("Couldn't start recording")
         }
     }
 
@@ -61,9 +75,9 @@ final class DictationController: ObservableObject {
             if !trimmed.isEmpty { onTranscript?(transcript) }
             state = .idle
         } catch let error as TranscriptionError {
-            state = .error(error.errorDescription ?? "Transcription failed")
+            setError(error.errorDescription ?? "Transcription failed")
         } catch {
-            state = .error("Transcription failed")
+            setError("Transcription failed")
         }
     }
 
