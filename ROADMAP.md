@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 58 — 2026-06-11 (race-condition fix from a fresh code review)
+- **Fix (desktop, race condition):** dispatched a code-review subagent on the hotkey handler + session manager; it found a real bug I'd missed. `setMode` was synchronous and skipped `waitForStartToSettle` (unlike cancel/complete). When the activating keys + a mode-switch key arrive in the same synchronous key-event batch, `setMode` ran while `startSession` was suspended on `initialize()`, so `scribaStreamController.setMode` early-returned (not streaming) and the **mode switch was silently dropped** — the dictation ran in the wrong mode while the pill showed the other. Made `setMode` await the start to settle. +1 race regression test; full lib suite green.
+- **Subagent also confirmed** the other start/stop/cancel races are already guarded + tested (no false positives acted on).
+- **Next:** more verified work.
+
 ### Iteration 57 — 2026-06-11 (README accuracy for the public repo)
 - **Docs:** the public README missed **snippets** entirely and described context-awareness inaccurately ("learns from usage patterns" — Scriba doesn't). Updated the Features to what's actually shipped: app-aware formatting, snippets, language forcing, spoken email/URL formatting. Refreshed the **iOS section** to its real state (Auth0 done, unit-tested, number pad, smart spacing/CJK, haptics, audio-interruption handling) instead of "early foundation".
 - **Verified (no change):** the snippets-then-grammar ordering — keeping cleanup → grammar → snippets (verbatim expansion) is **safer** than swapping (which would wrongly capitalize an email expansion at a sentence start).
