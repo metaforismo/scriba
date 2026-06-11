@@ -11,6 +11,7 @@ import { AnimatedCheck } from '@/app/components/ui/animated-checkmark'
 import { Lock } from '@mynaui/icons-react'
 import { usePermissionsStore } from '@/app/store/usePermissionsStore'
 import { useOnboardingStore } from '@/app/store/useOnboardingStore'
+import { usePlatform } from '@/app/hooks/usePlatform'
 import accessibilityVideo from '@/app/assets/accesssibility.webm'
 import microphoneVideo from '@/app/assets/microphone.webm'
 
@@ -24,6 +25,19 @@ export default function PermissionsContent() {
     setAccessibilityEnabled,
     setMicrophoneEnabled,
   } = usePermissionsStore()
+
+  const platform = usePlatform()
+  const isMac = platform === 'darwin'
+
+  // On macOS, accessibility/microphone access can't be re-prompted once denied —
+  // the user must enable it manually in System Settings. Deep-link them there so
+  // the "Allow" step can't dead-end.
+  const openPrivacySettings = (pane: 'Accessibility' | 'Microphone') => {
+    window.api?.invoke(
+      'web-open-url',
+      `x-apple.systempreferences:com.apple.preference.security?Privacy_${pane}`,
+    )
+  }
   const [checkingAccessibility, setCheckingAccessibility] = useState(false)
   const [checkingMicrophone, setCheckingMicrophone] = useState(false)
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
@@ -204,6 +218,20 @@ export default function PermissionsContent() {
                         </div>
                       )}
                     </div>
+                    {checkingAccessibility && isMac && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        Didn&apos;t see a prompt, or denied it? Enable{' '}
+                        <span className="font-medium">Scriba</span> under
+                        Accessibility, then come back here.
+                        <button
+                          type="button"
+                          className="ml-1 underline hover:text-foreground"
+                          onClick={() => openPrivacySettings('Accessibility')}
+                        >
+                          Open System Settings
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -254,6 +282,20 @@ export default function PermissionsContent() {
                         </div>
                       )}
                     </div>
+                    {checkingMicrophone && isMac && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        Didn&apos;t see a prompt, or denied it? Enable{' '}
+                        <span className="font-medium">Scriba</span> under
+                        Microphone, then come back here.
+                        <button
+                          type="button"
+                          className="ml-1 underline hover:text-foreground"
+                          onClick={() => openPrivacySettings('Microphone')}
+                        >
+                          Open System Settings
+                        </button>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
