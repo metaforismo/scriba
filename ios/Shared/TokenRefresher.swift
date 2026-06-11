@@ -14,16 +14,7 @@ enum Auth0TokenEndpoint {
         request.setValue(
             "application/x-www-form-urlencoded",
             forHTTPHeaderField: "Content-Type")
-        request.httpBody =
-            params
-            .map { key, value in
-                let encoded =
-                    value.addingPercentEncoding(
-                        withAllowedCharacters: .auth0FormAllowed) ?? value
-                return "\(key)=\(encoded)"
-            }
-            .joined(separator: "&")
-            .data(using: .utf8)
+        request.httpBody = FormURLEncoding.encode(params).data(using: .utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard
@@ -72,14 +63,4 @@ enum TokenRefresher {
         TokenStore.save(refreshed)
         return refreshed
     }
-}
-
-extension CharacterSet {
-    /// Unreserved characters for `application/x-www-form-urlencoded` values —
-    /// everything else (incl. `+ / =`) is percent-encoded.
-    static let auth0FormAllowed: CharacterSet = {
-        var set = CharacterSet.alphanumerics
-        set.insert(charactersIn: "-._~")
-        return set
-    }()
 }

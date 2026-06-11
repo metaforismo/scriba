@@ -47,6 +47,7 @@ targets:
       - Tests
       - Shared/TextInsertion.swift
       - Shared/WAVEncoder.swift
+      - Shared/FormURLEncoding.swift
       - Scriba/Auth/PKCE.swift
     settings:
       base:
