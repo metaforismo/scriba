@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 33 — 2026-06-11
+- **Feat (iOS, Wispr parity):** **haptic feedback** — a medium impact on the start/stop tap (immediate) + an error notification haptic when a dictation fails (`setError` helper). Works because the keyboard requires Full Access. **Build-verified** (xcodebuild simulator → BUILD SUCCEEDED).
+- **Reviewed** the keyboard stack while here (AudioRecorder, DictationController, KeyboardViewController) — well-built (reused converter preserves resampler state across buffers, proper NSLock, correct minimal WAV, secure/numeric field fallback). No fixes needed beyond haptics.
+- **Next:** more build-verified iOS polish or another testable desktop/server item.
+
 ### Iteration 32 — 2026-06-11 (iOS now compile-verified 🎉)
 - **Milestone:** built the iOS project for the first time (`xcodegen generate` in `ios/` → `xcodebuild -scheme Scriba -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO`). The app + keyboard-extension targets now **BUILD SUCCEEDED** — all the Swift written correct-by-inspection across iters actually compiles.
 - **Fix (real bug found by the build):** `UITextDocumentProxy.isSecureTextEntry` is `Bool?`, but `KeyboardContext.update` used it as a non-optional `Bool` → the keyboard target didn't compile. Now compares `== true` (nil ⇒ not secure). One-line fix; rebuild green.
