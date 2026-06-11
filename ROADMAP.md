@@ -96,6 +96,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 51 — 2026-06-11
+- **Feat (server, Wispr parity):** the cleanup pass now renders **clearly-spoken emails, URLs, and @handles in written form** ("john at gmail dot com" → "john@gmail.com", "github dot com slash scriba" → "github.com/scriba") — added the guideline to both the light and heavy cleanup prompts. Cleanup tests + type-check pass. Direct to main (prompt-only, low-risk).
+- **Next:** more research-driven, testable/runtime-verified work.
+
 ### Iteration 50 — 2026-06-11 (iOS explicit keyboard height) — PR #19
 - **Fix (iOS):** custom keyboards default to the system keyboard height, which can clip taller content — notably the new number pad on smaller devices. Added a high-priority (not required → no conflict with the system's layout) **280pt height constraint** that fits all field modes. Build-verified. PR #19 → merged. (Follow-up to the iter-49 number pad.)
 - **Next:** more research-driven, testable/runtime-verified work.
