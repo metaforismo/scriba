@@ -28,6 +28,8 @@ interface SettingsState {
   microphoneDeviceId: string
   microphoneName: string
   keyboardShortcuts: KeyboardShortcutConfig[]
+  handsFreeEnabled: boolean
+  setHandsFreeEnabled: (enabled: boolean) => void
   snippets: Snippet[]
   setSnippets: (snippets: Snippet[]) => void
   setShareAnalytics: (share: boolean) => void
@@ -73,6 +75,7 @@ const getInitialState = () => {
         id: crypto.randomUUID(),
       },
     ],
+    handsFreeEnabled: storedSettings?.handsFreeEnabled ?? false,
     snippets: storedSettings?.snippets ?? [],
     firstName: storedSettings?.firstName ?? '',
     lastName: storedSettings?.lastName ?? '',
@@ -172,6 +175,7 @@ export const useSettingsStore = create<SettingsState>(set => {
       }
     },
     setInteractionSounds: createSetter('interactionSounds', 'audio&mic'),
+    setHandsFreeEnabled: createSetter('handsFreeEnabled', 'keyboard'),
     setMuteAudioWhenDictating: createSetter(
       'muteAudioWhenDictating',
       'audio&mic',
