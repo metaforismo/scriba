@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 59 — 2026-06-11 (double-tap hands-free — user-requested) — PR #24
+- **Feat (desktop, Wispr parity):** **double-tap hands-free** dictation, **opt-in** via Keyboard settings (default off → push-to-talk unchanged for everyone else). When on: **hold** = push-to-talk; **double-tap** = hands-free (keeps recording after release; a single tap stops + inserts); a lone tap defers then completes. Escape / disabling shortcuts / listener-stop all cancel a hands-free or pending session. State machine in the key handler (HOLD_THRESHOLD 250ms, DOUBLE_TAP_WINDOW 350ms) designed to avoid a cancel/restart race (the first tap's session is reused). Added the `handsFreeEnabled` setting (main + renderer store) + a toggle in Keyboard settings. +4 keyboard tests; lib + app suites green. PR #24 → merged.
+- **(User directive 2026-06-11:** do double-tap hands-free, then iOS live streaming, ignore CI — saved as memory `scriba-loop-direction`.)
+- **Next: iOS live streaming.** Groq Whisper is batch-only; viable on-device path is Apple `SFSpeechRecognizer` for live interim results. Reconsider when starting.
+
 ### Iteration 58 — 2026-06-11 (race-condition fix from a fresh code review)
 - **Fix (desktop, race condition):** dispatched a code-review subagent on the hotkey handler + session manager; it found a real bug I'd missed. `setMode` was synchronous and skipped `waitForStartToSettle` (unlike cancel/complete). When the activating keys + a mode-switch key arrive in the same synchronous key-event batch, `setMode` ran while `startSession` was suspended on `initialize()`, so `scribaStreamController.setMode` early-returned (not streaming) and the **mode switch was silently dropped** — the dictation ran in the wrong mode while the pill showed the other. Made `setMode` await the start to settle. +1 race regression test; full lib suite green.
 - **Subagent also confirmed** the other start/stop/cancel races are already guarded + tested (no false positives acted on).
