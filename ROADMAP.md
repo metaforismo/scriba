@@ -63,7 +63,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ### P2 — Power features (match Wispr)
 - [ ] **Command Mode**: select → hotkey → spoken instruction → replace selection / insert at cursor. translate/summarize/tone + "press enter".
 - [ ] **Dictionary learns from corrections automatically** + dev-term/code-syntax awareness.
-- [~] **Snippets / voice text-expansion.** Engine done (PR #5): tested `expandSnippets`, `snippets` store field + `getSnippets()`, applied to the transcript before insertion. **Next: the management UI** (a settings section to add/remove snippets) — inert until then.
+- [x] **Snippets / voice text-expansion.** Engine (PR #5: tested `expandSnippets` + store field + pipeline wiring) **+ management UI** (PR #6: a "Snippets" settings tab to add/remove trigger→expansion pairs, persisted on blur, kept out of analytics). Complete feature.
 - [ ] **Multilingual + auto language detect** surfaced in settings (Whisper already auto-detects; no UI).
 - [ ] **Privacy-safe app-context formatting** (on-device active-window text, loudly disclosed, toggleable).
 
@@ -94,6 +94,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 27 — 2026-06-11 (snippets UI — feature complete) — PR #6
+- **Feat (desktop):** the snippets **management UI** — a new "Snippets" settings tab (trigger + expansion list, add/remove). Persists to the settings store (read by `getSnippets()` → already wired into dictation in PR #5), so it works end-to-end. Edits use a local draft persisted **on blur** (not per keystroke → avoids a disk write + IPC per char); the setter is custom (not the analytics-tracked `createSetter`) so snippet content stays out of analytics. App tests green; web type-check clean for the new files. PR #6 → merged. **Snippets is now a complete feature.**
+- **Next:** product-decision items (streaming ASR provider; hands-free; learns-from-corrections) await user input; otherwise small testable fixes / another self-contained feature.
 
 ### Iteration 26 — 2026-06-11 (snippets engine) — PR #5
 - **Feat (desktop, Wispr parity):** voice **text-expansion snippets** engine. `expandSnippets()` (pure, +6 tests: whole-word, case-insensitive, longest-first, lookaround boundaries so `c++`/`@home` match); `snippets` settings-store field (defaults `[]`) + `getSnippets()`; wired into `scribaSessionManager` to expand the final transcript before insertion (+1 test). Default empty → no behavior change. PR #5 → merged.
