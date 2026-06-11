@@ -292,12 +292,42 @@ describe('scribaSessionManager', () => {
     const { ScribaSessionManager } = await import('./scribaSessionManager')
     const session = new ScribaSessionManager()
 
-    session.setMode(ScribaMode.EDIT)
+    await session.setMode(ScribaMode.EDIT)
 
     expect(mockScribaStreamController.setMode).toHaveBeenCalledWith(ScribaMode.EDIT)
     expect(
       mockRecordingStateNotifier.notifyRecordingStarted,
     ).toHaveBeenCalledWith(ScribaMode.EDIT)
+  })
+
+  test('setMode waits for an in-flight start before changing mode (no dropped switch)', async () => {
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    // Make the start hang on initialize, simulating a mode switch that lands in
+    // the same key-event batch as the activating press.
+    let resolveInit: (v: boolean) => void = () => {}
+    mockScribaStreamController.initialize.mockReturnValueOnce(
+      new Promise<boolean>(resolve => {
+        resolveInit = resolve
+      }),
+    )
+
+    const startP = session.startSession(ScribaMode.TRANSCRIBE)
+    const modeP = session.setMode(ScribaMode.EDIT)
+
+    // The start hasn't settled, so the mode change must NOT have reached the
+    // controller yet (otherwise it would early-return and be dropped).
+    expect(mockScribaStreamController.setMode).not.toHaveBeenCalledWith(
+      ScribaMode.EDIT,
+    )
+
+    resolveInit(true)
+    await startP
+    await modeP
+
+    // Once streaming, the EDIT switch goes through.
+    expect(mockScribaStreamController.setMode).toHaveBeenCalledWith(ScribaMode.EDIT)
   })
 
   test('re-fetches context when switching into EDIT mode mid-session', async () => {

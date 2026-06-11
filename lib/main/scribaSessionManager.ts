@@ -139,7 +139,15 @@ export class ScribaSessionManager {
     }
   }
 
-  public setMode(mode: ScribaMode) {
+  public async setMode(mode: ScribaMode) {
+    // A mode switch can arrive while startSession is still in flight (the
+    // activating keys and the mode-switch key can land in the same synchronous
+    // key-event batch). Wait for the start to settle so the stream is actually
+    // streaming — otherwise scribaStreamController.setMode early-returns and the
+    // mode change is silently dropped: the session runs in the wrong mode while
+    // the pill shows the other one. Mirrors cancel/complete.
+    await this.waitForStartToSettle()
+
     // Send mode change to grpc stream (will also update windows via recordingStateNotifier)
     scribaStreamController.setMode(mode)
 
