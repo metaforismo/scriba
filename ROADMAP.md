@@ -96,6 +96,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 40 — 2026-06-11 (iOS app now actually runs 🎉 — critical bundle-ID fix) — PR #13
+- **Critical fix (iOS):** both `Info.plist` files were **missing `CFBundleIdentifier`** — with `GENERATE_INFOPLIST_FILE=NO`, Xcode doesn't inject it, so the built `.app`/`.appex` had **no bundle ID and could not be installed or launched** ("Missing bundle ID"). The app compiled and all unit tests passed every prior iteration, but it was **not runnable** (TestFlight/device installs would have failed). Added `$(PRODUCT_BUNDLE_IDENTIFIER)` + CFBundleName/Executable/PackageType to both. PR #13 → merged.
+- **How found:** for the first time I **ran the app in the simulator** (build → `simctl install` → `launch` → screenshot), not just build/unit-test. Install failed on the missing bundle ID. After the fix: bundle IDs `ai.scriba.app` / `ai.scriba.app.keyboard`, app launches and renders the onboarding screen ("Set up Scriba — Dictate into any app with a tap"), no crash. 17 unit tests still pass.
+- **New verification capability:** the app can be run + screenshotted in the sim — use it to catch runtime/layout issues that build+unit-tests miss. Booted sim UDID this session: `5895B43F-83B5-41D8-BF1C-08B55B9F3AC9`.
+- **Next:** more runtime-verified iOS polish, or testable desktop/server work.
+
 ### Iteration 39 — 2026-06-11 (iOS CI added + ⚠️ CI is billing-locked) — PR #12
 - **⚠️ CRITICAL FINDING (needs the user):** **GitHub Actions CI is completely non-functional — the account is billing-locked.** The CI Controller has shown `startup_failure` on *every* run for the whole session (main pushes + PRs); the real error, from the job annotation, is: **"The job was not started because your account is locked due to a billing issue."** So NO CI has run (TS tests, native, iOS) until the user resolves GitHub billing (Settings → Billing). Nothing code-side can fix this.
 - **Feat (ci):** added a standalone **`ios-build-check.yml`** (macos-latest: `brew install xcodegen` → `xcodegen generate` → `xcodebuild test` on a dynamically-selected iPhone sim, path-filtered to `ios/**`). Decoupled from the controller so it runs independently once billing is fixed. actionlint-clean; commands locally-verified (17 iOS tests pass). Also bumped deploy-server's deprecated actions (checkout@v3→v4, paths-filter@v2→v3) for hygiene. PR #12 → merged (its red CI is purely the billing lock, not the code).
