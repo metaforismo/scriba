@@ -16,11 +16,18 @@ final class AudioRecorder: ObservableObject {
     @Published private(set) var isRecording = false
     @Published private(set) var level: Float = 0
 
+    /// Called (on the main queue) when the capture is cut short by the system —
+    /// an interruption (phone call, another app) or a route change like AirPods
+    /// being removed. The owner should finalize so the audio captured so far
+    /// isn't silently lost (a common long-form/AirPods complaint).
+    var onInterrupted: (() -> Void)?
+
     private let engine = AVAudioEngine()
     private let targetSampleRate: Double = 16_000
     private var converter: AVAudioConverter?
     private let lock = NSLock()
     private var pcmSamples = [Int16]()
+    private var sessionObservers: [NSObjectProtocol] = []
 
     enum RecorderError: Error {
         case microphoneDenied
@@ -35,6 +42,7 @@ final class AudioRecorder: ObservableObject {
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
         try session.setActive(true, options: [])
+        observeInterruptions(session: session)
 
         lock.withLock { pcmSamples.removeAll(keepingCapacity: true) }
 
@@ -67,6 +75,7 @@ final class AudioRecorder: ObservableObject {
 
     /// Stops capture and returns the recorded utterance as WAV data.
     func stop() -> Data {
+        removeSessionObservers()
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         try? AVAudioSession.sharedInstance().setActive(
@@ -74,6 +83,46 @@ final class AudioRecorder: ObservableObject {
         publish(isRecording: false, level: 0)
         let samples = lock.withLock { pcmSamples }
         return WAVEncoder.encode(samples: samples, sampleRate: Int(targetSampleRate))
+    }
+
+    // MARK: - Interruptions / route changes
+
+    private func observeInterruptions(session: AVAudioSession) {
+        let center = NotificationCenter.default
+        let notify: (Notification) -> Void = { [weak self] _ in
+            self?.onInterrupted?()
+        }
+        sessionObservers.append(
+            center.addObserver(
+                forName: AVAudioSession.interruptionNotification,
+                object: session, queue: .main
+            ) { note in
+                guard
+                    let raw = note.userInfo?[AVAudioSessionInterruptionTypeKey]
+                        as? UInt,
+                    AVAudioSession.InterruptionType(rawValue: raw) == .began
+                else { return }
+                notify(note)
+            })
+        sessionObservers.append(
+            center.addObserver(
+                forName: AVAudioSession.routeChangeNotification,
+                object: session, queue: .main
+            ) { note in
+                // The previous input (e.g. AirPods) went away mid-recording.
+                guard
+                    let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey]
+                        as? UInt,
+                    AVAudioSession.RouteChangeReason(rawValue: raw)
+                        == .oldDeviceUnavailable
+                else { return }
+                notify(note)
+            })
+    }
+
+    private func removeSessionObservers() {
+        sessionObservers.forEach(NotificationCenter.default.removeObserver)
+        sessionObservers.removeAll()
     }
 
     // MARK: - Conversion (audio thread)

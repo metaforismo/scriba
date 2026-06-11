@@ -26,6 +26,19 @@ final class DictationController: ObservableObject {
     private let impact = UIImpactFeedbackGenerator(style: .medium)
     private let notify = UINotificationFeedbackGenerator()
 
+    init() {
+        // If the system cuts the recording short (call, another app, AirPods
+        // removed), finalize what we captured rather than losing it.
+        recorder.onInterrupted = { [weak self] in
+            Task { @MainActor in self?.handleInterruption() }
+        }
+    }
+
+    private func handleInterruption() {
+        guard state == .recording else { return }
+        Task { await finishRecording() }
+    }
+
     private func setError(_ message: String) {
         notify.notificationOccurred(.error)
         state = .error(message)
