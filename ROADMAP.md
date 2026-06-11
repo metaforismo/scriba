@@ -64,7 +64,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 - [ ] **Command Mode**: select → hotkey → spoken instruction → replace selection / insert at cursor. translate/summarize/tone + "press enter".
 - [ ] **Dictionary learns from corrections automatically** + dev-term/code-syntax awareness.
 - [x] **Snippets / voice text-expansion.** Engine (PR #5: tested `expandSnippets` + store field + pipeline wiring) **+ management UI** (PR #6: a "Snippets" settings tab to add/remove trigger→expansion pairs, persisted on blur, kept out of analytics). Complete feature.
-- [~] **Multilingual + language selection.** Server vertical done (iter 29): force a Whisper language ('auto' or ISO-639-1) via the `transcription-language` header (groqClient + V2 handler + mobile endpoint + validation). Default auto-detect. **Next: client language setting + UI** (a picker in settings).
+- [x] **Multilingual + language selection.** Server vertical (iter 29: `transcription-language` header → groqClient/V2/mobile + validation) **+ client setting & Language picker UI** (iter 30: setting default, store field, grpcClient header, dropdown in Advanced Settings). Default auto-detect. Complete feature (iOS client can send the header next).
 - [ ] **Privacy-safe app-context formatting** (on-device active-window text, loudly disclosed, toggleable).
 
 ### P3 — Mobile (new platforms)
@@ -94,6 +94,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 30 — 2026-06-11 (language picker UI — feature complete)
+- **Feat (desktop):** completed transcription language selection with the **client side** — `transcriptionLanguage` default ('auto') in shared-constants + generated defaults, an optional `LlmSettings` field + store default, the `transcription-language` header on `transcribeStreamV2`, and a **Language picker** (Auto-detect + ~16 common Whisper languages) in Advanced Settings. Default auto-detect → no behavior change. lib + app suites green; node + web type-check clean. **Language is now a complete feature** (the iOS client can send the header as a follow-up).
+- **Next:** product-decision items (streaming ASR provider; hands-free) await user input; otherwise small testable fixes / another self-contained feature.
 
 ### Iteration 29 — 2026-06-11 (language selection — server vertical)
 - **Feat (server, Wispr "100+ languages"):** lets a client **force a Whisper transcription language** (better accuracy for non-English speech) instead of always auto-detecting. Header-based (`transcription-language`, no proto change, like cleanup level): `groqClient` passes `language` to the Whisper call only when set (not 'auto'); `TranscriptionLanguageSchema` + `validateLanguage` ('auto' or ISO-639-1, never throws → 'auto'); read in the V2 handler + mobile `/v1/transcribe`. Default auto-detect → no behavior change. +4 tests; server suite green.
