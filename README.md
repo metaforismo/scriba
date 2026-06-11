@@ -32,9 +32,12 @@
 ### 🧠 **Smart & Adaptive**
 
 - **Custom dictionary**: Add technical terms, names, and specialized vocabulary
-- **Context awareness**: Learns from your usage patterns to improve accuracy
-- **Multi-language support**: Transcribe in multiple languages
-- **Intelligent punctuation**: Automatically adds appropriate punctuation
+- **App-aware formatting**: Adapts tone and structure to the app you're dictating
+  into — concise for chat, cleaner structure for email
+- **Multi-language support**: Force a transcription language or auto-detect (100+
+  languages)
+- **Intelligent punctuation**: Adds punctuation, resolves self-corrections, and
+  formats spoken emails/URLs ("john at gmail dot com" → "john@gmail.com")
 - **Adjustable cleanup**: Choose how much the AI polishes your dictation —
   **Verbatim** (raw, no LLM), **Light** (remove filler, fix punctuation), or
   **Heavy** (tighten and format for readability)
@@ -42,6 +45,8 @@
 ### ⚙️ **Powerful Customization**
 
 - **Flexible shortcuts**: Configure any key combination as your trigger
+- **Snippets**: Define spoken triggers that expand to longer text (say "my
+  address" to insert your full address)
 - **Audio preferences**: Choose your preferred microphone
 - **Privacy controls**: Local processing options and data control settings
 - **Seamless integration**: Works with any application
@@ -260,9 +265,12 @@ style: hold the 🌐 globe, switch to Scriba, tap the 🎙 mic, speak, and your 
 are inserted into any app. It records a short utterance, sends it to the server's
 `POST /v1/transcribe` endpoint, and inserts the transcript at the cursor.
 
-It's an early **foundation** (built with XcodeGen; container app + keyboard
-extension + shared layer). See [`ios/README.md`](./ios/README.md) for setup and
-the remaining work (real Auth0 sign-in, live streaming, on-device testing).
+Built with XcodeGen (container app + keyboard extension + shared layer) and
+covered by unit tests run on the simulator. Includes Auth0 sign-in (PKCE), a
+language picker + cleanup-level setting, a number pad for numeric fields, smart
+spacing (incl. CJK), key/dictation haptics, and graceful handling of audio
+interruptions (calls, AirPods). See [`ios/README.md`](./ios/README.md) for setup;
+**live streaming** and on-device sign-in polish are the main remaining work.
 
 ## 🏗️ Architecture
 
