@@ -95,6 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 28 — 2026-06-11
+- **Fix (P0 onboarding UX):** the permissions step could **dead-end** — clicking Allow then denying the OS prompt (or, for macOS Accessibility, where there's no yes/no) left it polling silently forever with no way forward. While polling on macOS it now shows a hint + an **"Open System Settings"** deep-link to the relevant privacy pane (`x-apple.systempreferences:…Privacy_Accessibility/Microphone`) so the user can enable Scriba manually and continue. Web type-check clean for the file.
+- **Next:** more onboarding/UX robustness (permission revocation re-check, alert()/confirm() → Dialog) or another self-contained feature (language selection); product-decision items still await user input.
+
 ### Iteration 27 — 2026-06-11 (snippets UI — feature complete) — PR #6
 - **Feat (desktop):** the snippets **management UI** — a new "Snippets" settings tab (trigger + expansion list, add/remove). Persists to the settings store (read by `getSnippets()` → already wired into dictation in PR #5), so it works end-to-end. Edits use a local draft persisted **on blur** (not per keystroke → avoids a disk write + IPC per char); the setter is custom (not the analytics-tracked `createSetter`) so snippet content stays out of analytics. App tests green; web type-check clean for the new files. PR #6 → merged. **Snippets is now a complete feature.**
 - **Next:** product-decision items (streaming ASR provider; hands-free; learns-from-corrections) await user input; otherwise small testable fixes / another self-contained feature.
