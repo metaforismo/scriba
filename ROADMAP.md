@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 61 — 2026-06-11 (iOS dictation race/lifecycle fixes from review) — PR #26
+- **Fix (iOS, found by a fresh code-review subagent on the audio/dictation stack):** real bugs in the code just written. (1) **Double-start crash** — `state` flips to `.recording` only after the async `recorder.start()`, so two quick taps both started → a 2nd `installTap` throws an uncatchable NSException; added an `isStarting` guard set before the await. (2) **Empty-audio dead path** — `recorder.stop()` always returns ≥44 bytes (WAV header) so `audio.isEmpty` was never true → no-speech taps got POSTed + errored; guard on `audio.count > WAVEncoder.headerSize`. (3) **Stale interim leak** — clear `LiveTranscriber.interim` before the availability guard (+ in `stop()`). (4) Minor: tear down session/observers on a failed `engine.start()`. Build + 31 tests green. PR #26 → merged.
+- **Process win:** the code-review subagent has now found real bugs twice (iters 58, 61) — running it after writing complex/concurrent code is worth it.
+- **Next:** continue Wispr-parity polish / fixes.
+
 ### Iteration 60 — 2026-06-11 (iOS live streaming — user-requested) — PR #25
 - **Feat (iOS, Wispr parity):** **live streaming transcription preview**. Groq Whisper is batch-only, so the live "words appear as you speak" feel comes from Apple's **on-device `SFSpeechRecognizer`** as a preview; the accurate **final** still comes from the server and is what's inserted. `LiveTranscriber` (on-device, partial results, locale from the language setting, graceful no-op if permission denied); `AudioRecorder` fans raw tap buffers out via `onBuffer`; `DictationController` feeds it off the audio thread (captures the transcriber, not `@MainActor` self) + starts/stops with recording + requests speech auth; `KeyboardView` shows interim words during recording (head-truncated). Info.plist usage strings. **Additive — existing record→POST→insert unchanged.** Build- + test-verified (31 iOS tests). PR #25 → merged.
 - **Both user-requested features done** (double-tap hands-free #24, iOS live streaming #25).
