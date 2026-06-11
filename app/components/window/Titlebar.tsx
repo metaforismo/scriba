@@ -6,6 +6,13 @@ import { UserCircle, PanelLeft, CogFour, Logout } from '@mynaui/icons-react'
 import { useMainStore } from '@/app/store/useMainStore'
 import { useAuthStore } from '@/app/store/useAuthStore'
 import { useAuth } from '@/app/components/auth/useAuth'
+import { Button } from '@/app/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from '@/app/components/ui/dialog'
 
 export const Titlebar = () => {
   const { onboardingCompleted } = useOnboardingStore()
@@ -18,6 +25,7 @@ export const Titlebar = () => {
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [isUpdateAvailable, setIsUpdateAvailable] = useState(false)
   const [isUpdateDownloaded, setUpdateDownloaded] = useState(false)
+  const [showUpdateConfirm, setShowUpdateConfirm] = useState(false)
 
   // Handle clicks outside dropdown to close it
   useEffect(() => {
@@ -151,15 +159,7 @@ export const Titlebar = () => {
                   : 'cursor-not-allowed opacity-70'
               }`}
               disabled={!isUpdateDownloaded}
-              onClick={() => {
-                if (
-                  confirm(
-                    'Are you sure you want to install the update? The app will restart.',
-                  )
-                ) {
-                  window.api.updater.installUpdate()
-                }
-              }}
+              onClick={() => setShowUpdateConfirm(true)}
             >
               {isUpdateDownloaded ? 'Install Update' : 'Downloading Update...'}
             </button>
@@ -208,6 +208,33 @@ export const Titlebar = () => {
           </div>
         </div>
       )}
+
+      <Dialog open={showUpdateConfirm} onOpenChange={setShowUpdateConfirm}>
+        <DialogContent>
+          <DialogTitle>Install update?</DialogTitle>
+          <DialogDescription>
+            Scriba will restart to install the update.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowUpdateConfirm(false)}
+              type="button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowUpdateConfirm(false)
+                window.api.updater.installUpdate()
+              }}
+              type="button"
+            >
+              Install &amp; restart
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
