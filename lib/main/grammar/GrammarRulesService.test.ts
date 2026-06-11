@@ -146,6 +146,25 @@ describe('GrammarRulesService', () => {
         expect(result).toBe(' Hello')
       })
 
+      test('should NOT add space when continuing CJK text', () => {
+        // CJK scripts don't separate words with spaces.
+        expect(
+          new GrammarRulesService('你好').addLeadingSpaceIfNeeded('世界'),
+        ).toBe('世界')
+        expect(
+          new GrammarRulesService('こんにちは').addLeadingSpaceIfNeeded('です'),
+        ).toBe('です')
+        expect(
+          new GrammarRulesService('안녕하').addLeadingSpaceIfNeeded('세요'),
+        ).toBe('세요')
+      })
+
+      test('should still add space after accented Latin', () => {
+        expect(
+          new GrammarRulesService('café').addLeadingSpaceIfNeeded('ouvert'),
+        ).toBe(' ouvert')
+      })
+
       test('should not add space after existing whitespace', () => {
         const grammarService = new GrammarRulesService('word ')
         const result = grammarService.addLeadingSpaceIfNeeded('Hello')

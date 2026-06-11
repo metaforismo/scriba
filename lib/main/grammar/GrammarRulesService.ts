@@ -91,6 +91,12 @@ export class GrammarRulesService {
       return false
     }
 
+    // CJK scripts (Chinese/Japanese/Korean) don't separate words with spaces, so
+    // don't add one when continuing CJK text.
+    if (this.isCJK(lastChar)) {
+      return false
+    }
+
     // Add space if context ends with a letter, number, or closing punctuation
     if (/[a-zA-Z0-9)\]}"'`.,;:!?]$/.test(context)) {
       return true
@@ -98,6 +104,18 @@ export class GrammarRulesService {
 
     // For other cases, do add space
     return true
+  }
+
+  /** True for CJK ideographs, kana, and Hangul — scripts that don't use spaces. */
+  private isCJK(char: string): boolean {
+    const code = char.codePointAt(0)
+    if (code === undefined) return false
+    return (
+      (code >= 0x4e00 && code <= 0x9fff) || // CJK Unified Ideographs
+      (code >= 0x3400 && code <= 0x4dbf) || // CJK Extension A
+      (code >= 0x3040 && code <= 0x30ff) || // Hiragana + Katakana
+      (code >= 0xac00 && code <= 0xd7af) // Hangul syllables
+    )
   }
 
   private isProperNoun(word: string): boolean {
