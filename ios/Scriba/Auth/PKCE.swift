@@ -12,8 +12,14 @@ struct PKCE {
     init() {
         verifier = Self.randomURLSafe(byteCount: 64)
         state = Self.randomURLSafe(byteCount: 32)
+        challenge = Self.challenge(for: verifier)
+    }
+
+    /// The S256 code challenge for a verifier: base64url(SHA256(verifier)), per
+    /// RFC 7636 §4.2. Pure, so it's verifiable against the spec's test vector.
+    static func challenge(for verifier: String) -> String {
         let digest = SHA256.hash(data: Data(verifier.utf8))
-        challenge = Data(digest).base64URLEncodedString()
+        return Data(digest).base64URLEncodedString()
     }
 
     private static func randomURLSafe(byteCount: Int) -> String {
