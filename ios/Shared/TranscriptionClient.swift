@@ -52,6 +52,9 @@ struct TranscriptionClient {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(
             cleanupLevel.rawValue, forHTTPHeaderField: "transcript-cleanup-level")
+        request.setValue(
+            TranscriptionLanguage.current,
+            forHTTPHeaderField: "transcription-language")
         request.timeoutInterval = 30
 
         let body: [String: Any] = [
