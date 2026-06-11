@@ -77,7 +77,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ### P4 — Desktop robustness & polish
 - [ ] **Native text injection** instead of clipboard-paste (`native/text-writer/macos_writer.rs` clobbers clipboard, loses non-text content, 1s restore race, fails in secure fields).
-- [ ] **EDIT "empty result" sentinel** — `adjustTranscript` returns `' '` to allow emptying, but `TextInserter` rejects whitespace (`TextInserter.ts:7`); decide explicit "clear selection" path vs drop the dead sentinel.
+- [x] **EDIT "empty result" sentinel** — resolved earlier: `groqClient`/`cerebrasClient` `adjustTranscript` now return `''` (not `' '`), so an empty rewrite is falsy in `scribaSessionManager` and insertion is skipped cleanly (no misleading "Insert failed"/clipboard-fallback). (Active "clear selection" via voice would need native key simulation — deferred.)
 - [ ] **Runtime footprint** — profile/idle RAM+CPU; stay well under Wispr's ~800MB/8%. Never freeze the target app (their Windows VS Code bug).
 - [ ] **Remove dead V1 path** (`transcribeStreamHandler.ts` `@deprecated`, `grpcClient.transcribeStream`/`getHeadersWithMetadata`) — duplicated context-gather work, maintenance noise.
 - [ ] **Windows parity** — accessibility context / selected-text / cursor-context are macOS-only (`ContextGrabber.ts:99`, `main.ts:136`).
@@ -95,6 +95,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 46 — 2026-06-11 (docs accuracy + backlog audit)
+- **Fix (docs):** `CLAUDE.md` said the dev branch was `dev` (it's **`main`**) — corrected, so contributors/agents don't work on the wrong branch. Also documented `lib/`, `native/`, **`ios/`** in the structure and added an **iOS App** section (XcodeGen + the verified build/test commands, the `Shared`/`Tests` layout, backend/Auth0 config, CI workflow).
+- **Backlog audit:** confirmed the **EDIT empty-result sentinel** is already resolved (clients return `''`, not `' '` → clean skip, no false "Insert failed"); marked done. Confirmed the **V1 path can't be fully removed** (its RPC is in the generated proto and `buf` isn't available to regenerate) — only the desktop client's `transcribeStream`/`getHeadersWithMetadata` are dead (called solely by their own tests); left in place rather than a risky partial deletion.
+- **Next:** more testable/runtime-verified work; big items still await the user (CI billing, streaming ASR provider).
 
 ### Iteration 45 — 2026-06-11 (iOS Credentials expiry/Codable tested) — PR #16
 - **Test (iOS):** covered `Credentials.isExpired` / `expiresSoon` (drives proactive token refresh — wrong thresholds → refreshing too early or, worse, requests failing on an expired token) and the Codable round-trip (Credentials is JSON-persisted in the Keychain; an encoding bug would break token storage). Default + custom refresh window, nil-optional encoding. **26 iOS tests total, TEST SUCCEEDED.** PR #16 → merged.

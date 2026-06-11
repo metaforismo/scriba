@@ -6,14 +6,17 @@ This is the SCRIBA project - an AI assistant application with both client and se
 
 ## Project Structure
 
-- `app/` - Client application code
+- `app/` - Renderer (React) client application code
+- `lib/` - Electron main-process code
 - `server/` - Server-side code with gRPC services
 - `server/src/scriba.proto` - Protocol buffer definitions
 - `server/src/clients/` - Various client implementations (Groq, LLM providers, etc.)
+- `native/` - Rust binaries (keyboard listener, audio, text writer, etc.)
+- `ios/` - Native iOS app + keyboard extension (Swift, XcodeGen)
 
 ## Branch
 
-Main development branch: `dev`
+Main development branch: `main`
 
 ## Development Commands
 
@@ -111,6 +114,36 @@ Native tests and builds are integrated into the existing CI workflows:
 
 - Full release compilation happens during tagged releases
 - Also includes compilation verification before packaging
+
+## iOS App (`ios/`)
+
+Native Swift app + keyboard extension (a Wispr Flow–style dictation keyboard).
+The Xcode project is generated from `project.yml` with XcodeGen and is **not**
+committed (`.xcodeproj` is gitignored), so the structure is reviewable as YAML.
+
+- Targets: `Scriba` (container app), `ScribaKeyboard` (keyboard extension),
+  `ScribaTests` (host-less logic tests).
+- Pure, testable helpers live in `ios/Shared/*.swift`; their tests in `ios/Tests/`
+  (also listed under the `ScribaTests` sources in `project.yml`).
+
+Generate the project, then build / test on a simulator (no signing needed for
+verification):
+
+```bash
+cd ios
+xcodegen generate
+# Build the app + keyboard
+xcodebuild build -project Scriba.xcodeproj -scheme Scriba \
+  -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
+# Run the unit tests (use a BOOTED simulator's UDID, not a name)
+xcodebuild test -project Scriba.xcodeproj -scheme Scriba \
+  -destination "id=$(xcrun simctl list devices booted | grep -oE '[0-9A-F-]{36}' | head -1)" \
+  CODE_SIGNING_ALLOWED=NO
+```
+
+The backend URL (default `http://localhost:3000`) and Auth0 settings are read from
+Info.plist build settings (`SCRIBA_BACKEND_URL`, `AUTH0_*`) or in-app settings, so
+forks point at their own server. CI: `.github/workflows/ios-build-check.yml`.
 
 ## Code Style Preferences
 
