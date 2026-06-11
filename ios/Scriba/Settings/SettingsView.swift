@@ -4,6 +4,7 @@ struct SettingsView: View {
     @ObservedObject var auth: AuthManager
 
     @State private var cleanupLevel = CleanupLevel.current
+    @State private var language = TranscriptionLanguage.current
     @State private var backendURL = BackendConfig.baseURL.absoluteString
     @State private var devToken = ""
 
@@ -55,6 +56,20 @@ struct SettingsView: View {
                     .onChange(of: cleanupLevel) { _, newValue in
                         CleanupLevel.set(newValue)
                     }
+                }
+
+                Section("Language") {
+                    Picker("Language", selection: $language) {
+                        ForEach(TranscriptionLanguage.options) { option in
+                            Text(option.label).tag(option.code)
+                        }
+                    }
+                    .onChange(of: language) { _, newValue in
+                        TranscriptionLanguage.set(newValue)
+                    }
+                    Text("Force a transcription language, or auto-detect.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("Server") {
