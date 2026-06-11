@@ -95,6 +95,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 31 — 2026-06-11 (iOS language parity) — PR #7
+- **Feat (iOS):** brought transcription **language selection** to the iOS keyboard for cross-platform parity. `TranscriptionLanguage` (Shared): 'auto' + ~16 common Whisper languages (ISO-639-1), stored in the App Group, with `current`/`set` (mirrors `CleanupLevel`); `TranscriptionClient` now sends the `transcription-language` header (server already honors it); a **Language picker** in the app Settings. Default auto-detect. iOS-only, correct-by-inspection. PR #7 → merged. **Language is now complete on desktop + iOS.**
+- **Next:** product-decision items (streaming ASR provider; hands-free) await user input; otherwise small testable fixes / another self-contained feature.
+
 ### Iteration 30 — 2026-06-11 (language picker UI — feature complete)
 - **Feat (desktop):** completed transcription language selection with the **client side** — `transcriptionLanguage` default ('auto') in shared-constants + generated defaults, an optional `LlmSettings` field + store default, the `transcription-language` header on `transcribeStreamV2`, and a **Language picker** (Auto-detect + ~16 common Whisper languages) in Advanced Settings. Default auto-detect → no behavior change. lib + app suites green; node + web type-check clean. **Language is now a complete feature** (the iOS client can send the header as a follow-up).
 - **Next:** product-decision items (streaming ASR provider; hands-free) await user input; otherwise small testable fixes / another self-contained feature.
