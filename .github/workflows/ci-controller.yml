@@ -16,9 +16,6 @@ jobs:
   native-build-check:
     uses: ./.github/workflows/native-build-check.yml
 
-  ios-build-check:
-    uses: ./.github/workflows/ios-build-check.yml
-
   # This job ONLY runs for pushes to 'dev' and 'main'
   deploy-server:
     needs: run-tests

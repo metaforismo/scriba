@@ -1,6 +1,17 @@
 name: iOS Build & Test
 
+# Runs standalone (not via the CI controller) so the iOS check works
+# independently. Path-filtered to iOS changes to save macOS runner minutes.
 on:
+  push:
+    branches: ['main', 'dev']
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build-check.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build-check.yml'
   workflow_call:
 
 jobs:
