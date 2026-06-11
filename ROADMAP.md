@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 37 — 2026-06-11 (iOS PKCE auth crypto tested) — PR #10
+- **Test (iOS, security):** extracted a pure `PKCE.challenge(for:)` (S256) and verified it against **RFC 7636 Appendix B's published vector** — a wrong code challenge would make Auth0 reject every login, so this pins the auth crypto down. Also covers base64url-without-padding + generated-pair consistency. **13 iOS tests total, TEST SUCCEEDED.** PR #10 → merged. (GitHub API had a transient outage mid-iteration; retried PR create until it recovered.)
+- **iOS test coverage so far:** smart-spacing, WAV encoder, PKCE challenge.
+- **Next:** more testable desktop/server or iOS work.
+
 ### Iteration 36 — 2026-06-11
 - **Fix (server, real bug):** `/v1/transcribe` (the iOS keyboard's endpoint) had **no per-route `bodyLimit`**, so Fastify's **1 MB default** rejected any dictation over ~20 s (>1 MB base64) with a generic 413 *before* the handler ran — making the handler's 25 MB audio cap dead code. Added a per-route `bodyLimit` sized to the audio cap + base64/JSON overhead, so the handler's cap is the real gate. +1 test (a >1 MB body now reaches the handler). 8/8 mobile tests pass; type-check clean.
 - **Next:** more testable desktop/server fixes or build/test-verified iOS work.
