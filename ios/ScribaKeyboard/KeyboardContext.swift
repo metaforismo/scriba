@@ -17,7 +17,9 @@ final class KeyboardContext: ObservableObject {
 
     /// Recompute from the host text field's input traits.
     func update(from proxy: UITextDocumentProxy) {
-        if proxy.isSecureTextEntry {
+        // `isSecureTextEntry` is optional on UITextDocumentProxy; nil means the
+        // host didn't declare it, so treat only an explicit true as secure.
+        if proxy.isSecureTextEntry == true {
             fieldMode = .secure
         } else if Self.isNumeric(proxy.keyboardType) {
             fieldMode = .numeric
