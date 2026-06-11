@@ -300,6 +300,10 @@ class GrpcClient {
       if (cleanupLevel) {
         headers.set('transcript-cleanup-level', cleanupLevel)
       }
+      const language = getAdvancedSettings().llm.transcriptionLanguage
+      if (language) {
+        headers.set('transcription-language', language)
+      }
       const response = await this.client.transcribeStreamV2(stream, {
         headers,
         signal,

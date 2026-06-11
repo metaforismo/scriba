@@ -53,4 +53,7 @@ When you receive a transcript, immediately return the polished version following
 
   // Transcript cleanup level for dictation mode: 'verbatim' | 'light' | 'heavy'
   transcriptCleanupLevel: 'verbatim',
+
+  // Transcription language: 'auto' or an ISO-639-1 code
+  transcriptionLanguage: 'auto',
 } as const

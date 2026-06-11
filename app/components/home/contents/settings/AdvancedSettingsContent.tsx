@@ -108,6 +108,28 @@ const llmSettingsConfig: LlmSettingConfig[] = [
   },
 ]
 
+// 'auto' + common Whisper languages (ISO-639-1). Forcing a language can improve
+// accuracy for non-English speech; 'auto' lets Whisper detect it.
+const LANGUAGE_OPTIONS: { code: string; label: string }[] = [
+  { code: 'auto', label: 'Auto-detect' },
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Spanish' },
+  { code: 'fr', label: 'French' },
+  { code: 'de', label: 'German' },
+  { code: 'it', label: 'Italian' },
+  { code: 'pt', label: 'Portuguese' },
+  { code: 'nl', label: 'Dutch' },
+  { code: 'pl', label: 'Polish' },
+  { code: 'ru', label: 'Russian' },
+  { code: 'uk', label: 'Ukrainian' },
+  { code: 'tr', label: 'Turkish' },
+  { code: 'ar', label: 'Arabic' },
+  { code: 'hi', label: 'Hindi' },
+  { code: 'zh', label: 'Chinese' },
+  { code: 'ja', label: 'Japanese' },
+  { code: 'ko', label: 'Korean' },
+]
+
 function formatDisplayValue(value: string | number | null): string {
   if (value === null) {
     return ''
@@ -352,6 +374,25 @@ export default function AdvancedSettingsContent() {
     ],
   )
 
+  const handleLanguageChange = useCallback(
+    (language: string) => {
+      const updatedLlm = { ...llm, transcriptionLanguage: language }
+      setLlmSettings({ transcriptionLanguage: language })
+      scheduleAdvancedSettingsUpdate(
+        updatedLlm,
+        grammarServiceEnabled,
+        macosAccessibilityContextEnabled,
+      )
+    },
+    [
+      llm,
+      grammarServiceEnabled,
+      macosAccessibilityContextEnabled,
+      setLlmSettings,
+      scheduleAdvancedSettingsUpdate,
+    ],
+  )
+
   const handleRestoreDefaults = useCallback(() => {
     const defaultLlmSettings: LlmSettings = {
       asrProvider: null,
@@ -364,6 +405,7 @@ export default function AdvancedSettingsContent() {
       editingPrompt: null,
       noSpeechThreshold: null,
       transcriptCleanupLevel: 'verbatim',
+      transcriptionLanguage: 'auto',
     }
     setLlmSettings(defaultLlmSettings)
     scheduleAdvancedSettingsUpdate(
@@ -437,6 +479,32 @@ export default function AdvancedSettingsContent() {
                 },
               )}
             </div>
+          </div>
+
+          {/* Transcription language */}
+          <div className="mt-5 ml-1 mr-1">
+            <label
+              htmlFor="transcription-language"
+              className="block text-sm font-medium text-slate-700"
+            >
+              Language
+            </label>
+            <p className="text-xs text-slate-500 mt-1 mb-2">
+              Force a transcription language for better accuracy, or let Scriba
+              detect it automatically.
+            </p>
+            <select
+              id="transcription-language"
+              value={llm.transcriptionLanguage ?? 'auto'}
+              onChange={e => handleLanguageChange(e.target.value)}
+              className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {LANGUAGE_OPTIONS.map(option => (
+                <option key={option.code} value={option.code}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 

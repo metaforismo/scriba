@@ -17,6 +17,9 @@ export interface LlmSettings {
   // transcript; 'light'/'heavy' run an LLM polish pass. Optional/null/absent is
   // treated as verbatim (e.g. settings stored before this field existed).
   transcriptCleanupLevel?: TranscriptCleanupLevel | null
+  // Transcription language: 'auto' (auto-detect) or an ISO-639-1 code.
+  // Optional/null/absent is treated as 'auto'.
+  transcriptionLanguage?: string | null
 }
 
 interface AdvancedSettingsState {

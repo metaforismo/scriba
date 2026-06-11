@@ -57,6 +57,10 @@ When you receive a transcript, immediately return the polished version following
   //   'heavy'    -> additionally tighten, restructure and format for readability
   // Default 'verbatim' so dictation behavior/cost is unchanged until the user opts in.
   transcriptCleanupLevel: 'verbatim',
+
+  // Transcription language: 'auto' (Whisper auto-detects) or an ISO-639-1 code
+  // (e.g. 'en', 'es') to force a language for better accuracy.
+  transcriptionLanguage: 'auto',
 }
 
 module.exports = { DEFAULT_ADVANCED_SETTINGS }

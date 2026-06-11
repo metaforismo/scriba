@@ -38,6 +38,9 @@ export const DEFAULT_ADVANCED_SETTINGS = {
 
   // Transcript cleanup level for dictation mode: 'verbatim' | 'light' | 'heavy'
   transcriptCleanupLevel: '${DEFAULT_ADVANCED_SETTINGS.transcriptCleanupLevel}',
+
+  // Transcription language: 'auto' or an ISO-639-1 code
+  transcriptionLanguage: '${DEFAULT_ADVANCED_SETTINGS.transcriptionLanguage}',
 } as const;
 `
 
