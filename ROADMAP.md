@@ -96,6 +96,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 32 — 2026-06-11 (iOS now compile-verified 🎉)
+- **Milestone:** built the iOS project for the first time (`xcodegen generate` in `ios/` → `xcodebuild -scheme Scriba -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO`). The app + keyboard-extension targets now **BUILD SUCCEEDED** — all the Swift written correct-by-inspection across iters actually compiles.
+- **Fix (real bug found by the build):** `UITextDocumentProxy.isSecureTextEntry` is `Bool?`, but `KeyboardContext.update` used it as a non-optional `Bool` → the keyboard target didn't compile. Now compares `== true` (nil ⇒ not secure). One-line fix; rebuild green.
+- **How to repro the build:** `cd ios && xcodegen generate && xcodebuild build -project Scriba.xcodeproj -scheme Scriba -destination 'generic/platform=iOS Simulator' -configuration Debug CODE_SIGNING_ALLOWED=NO`. `.xcodeproj` is gitignored (generated from `project.yml`).
+- **Next:** now that iOS compiles, iOS changes can be **build-verified** every time. Could also boot a simulator + run for runtime checks. Continue features/fixes.
+
 ### Iteration 31 — 2026-06-11 (iOS language parity) — PR #7
 - **Feat (iOS):** brought transcription **language selection** to the iOS keyboard for cross-platform parity. `TranscriptionLanguage` (Shared): 'auto' + ~16 common Whisper languages (ISO-639-1), stored in the App Group, with `current`/`set` (mirrors `CleanupLevel`); `TranscriptionClient` now sends the `transcription-language` header (server already honors it); a **Language picker** in the app Settings. Default auto-detect. iOS-only, correct-by-inspection. PR #7 → merged. **Language is now complete on desktop + iOS.**
 - **Next:** product-decision items (streaming ASR provider; hands-free) await user input; otherwise small testable fixes / another self-contained feature.
