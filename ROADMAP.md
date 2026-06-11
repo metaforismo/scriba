@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 60 — 2026-06-11 (iOS live streaming — user-requested) — PR #25
+- **Feat (iOS, Wispr parity):** **live streaming transcription preview**. Groq Whisper is batch-only, so the live "words appear as you speak" feel comes from Apple's **on-device `SFSpeechRecognizer`** as a preview; the accurate **final** still comes from the server and is what's inserted. `LiveTranscriber` (on-device, partial results, locale from the language setting, graceful no-op if permission denied); `AudioRecorder` fans raw tap buffers out via `onBuffer`; `DictationController` feeds it off the audio thread (captures the transcriber, not `@MainActor` self) + starts/stops with recording + requests speech auth; `KeyboardView` shows interim words during recording (head-truncated). Info.plist usage strings. **Additive — existing record→POST→insert unchanged.** Build- + test-verified (31 iOS tests). PR #25 → merged.
+- **Both user-requested features done** (double-tap hands-free #24, iOS live streaming #25).
+- **Next:** continue Wispr-parity polish / fixes; the live preview could later replace the server final for a fully-on-device fast path (a product choice).
+
 ### Iteration 59 — 2026-06-11 (double-tap hands-free — user-requested) — PR #24
 - **Feat (desktop, Wispr parity):** **double-tap hands-free** dictation, **opt-in** via Keyboard settings (default off → push-to-talk unchanged for everyone else). When on: **hold** = push-to-talk; **double-tap** = hands-free (keeps recording after release; a single tap stops + inserts); a lone tap defers then completes. Escape / disabling shortcuts / listener-stop all cancel a hands-free or pending session. State machine in the key handler (HOLD_THRESHOLD 250ms, DOUBLE_TAP_WINDOW 350ms) designed to avoid a cancel/restart race (the first tap's session is reused). Added the `handsFreeEnabled` setting (main + renderer store) + a toggle in Keyboard settings. +4 keyboard tests; lib + app suites green. PR #24 → merged.
 - **(User directive 2026-06-11:** do double-tap hands-free, then iOS live streaming, ignore CI — saved as memory `scriba-loop-direction`.)
