@@ -6,6 +6,7 @@ import { SCRIBA_MODE_SHORTCUT_DEFAULTS } from '../constants/keyboard-defaults.js
 import { KeyName, normalizeLegacyKey } from '../types/keyboard.js'
 import { KeyValueStore } from './sqlite/repo'
 import { resolveDefaultKeys } from '../utils/settings.js'
+import type { Snippet } from '../utils/snippets.js'
 
 export interface KeyboardShortcutConfig {
   id: string
@@ -32,6 +33,7 @@ export interface SettingsStore {
   microphoneName: string
   isShortcutGloballyEnabled: boolean
   keyboardShortcuts: KeyboardShortcutConfig[]
+  snippets: Snippet[]
   firstName: string
   lastName: string
   email: string
@@ -111,6 +113,11 @@ export const getAdvancedSettings = (): AdvancedSettings => {
   return { ...storeSettings }
 }
 
+export const getSnippets = (): Snippet[] => {
+  const settings = store.get(STORE_KEYS.SETTINGS) as SettingsStore | undefined
+  return Array.isArray(settings?.snippets) ? settings.snippets : []
+}
+
 export const defaultValues: AppStore = {
   onboarding: { onboardingStep: 0, onboardingCompleted: false },
   settings: {
@@ -139,6 +146,7 @@ export const defaultValues: AppStore = {
         mode: ScribaMode.EDIT,
       },
     ],
+    snippets: [],
     firstName: '',
     lastName: '',
     email: '',

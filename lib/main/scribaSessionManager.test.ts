@@ -120,8 +120,10 @@ mock.module('./grammar/GrammarRulesService', () => ({
 const mockGetAdvancedSettings = mock(() => ({
   grammarServiceEnabled: false,
 }))
+const mockGetSnippets = mock((): Array<{ trigger: string; expansion: string }> => [])
 mock.module('./store', () => ({
   getAdvancedSettings: mockGetAdvancedSettings,
+  getSnippets: mockGetSnippets,
 }))
 
 mock.module('electron-log', () => ({
@@ -158,6 +160,8 @@ describe('scribaSessionManager', () => {
 
     mockClipboard.writeText.mockClear()
     mockGetAdvancedSettings.mockClear()
+    mockGetSnippets.mockClear()
+    mockGetSnippets.mockReturnValue([])
 
     // Reset default behaviors
     mockScribaStreamController.initialize.mockResolvedValue(true)
@@ -433,6 +437,27 @@ describe('scribaSessionManager', () => {
     )
     expect(mockScribaStreamController.endInteraction).toHaveBeenCalled()
     expect(mockInteractionManager.clearCurrentInteraction).toHaveBeenCalled()
+  })
+
+  test('expands voice snippets in the inserted text', async () => {
+    mockGetSnippets.mockReturnValue([
+      { trigger: 'my email', expansion: 'jane@example.com' },
+    ])
+    mockScribaStreamController.startGrpcStream.mockResolvedValueOnce({
+      response: { transcript: 'send it to my email please' },
+      audioBuffer: Buffer.from('audio-data'),
+      sampleRate: 16000,
+    })
+
+    const { ScribaSessionManager } = await import('./scribaSessionManager')
+    const session = new ScribaSessionManager()
+
+    await session.startSession(ScribaMode.TRANSCRIBE)
+    await session.completeSession()
+
+    expect(mockTextInserter.insertText).toHaveBeenCalledWith(
+      'send it to jane@example.com please',
+    )
   })
 
   test('should apply grammar rules when enabled', async () => {
