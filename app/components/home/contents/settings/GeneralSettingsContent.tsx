@@ -3,10 +3,22 @@ import { Switch } from '@/app/components/ui/switch'
 import { Button } from '@/app/components/ui/button'
 import { useSettingsStore } from '@/app/store/useSettingsStore'
 import { useWindowContext } from '@/app/components/window/WindowContext'
+import { StatusIndicator } from '@/app/components/ui/status-indicator'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from '@/app/components/ui/dialog'
 
 export default function GeneralSettingsContent() {
   const [isDownloading, setIsDownloading] = useState(false)
   const [isClearing, setIsClearing] = useState(false)
+  const [statusIndicator, setStatusIndicator] = useState<
+    'success' | 'error' | null
+  >(null)
+  const [statusMessage, setStatusMessage] = useState('')
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
   const {
     shareAnalytics,
     launchAtLogin,
@@ -29,36 +41,37 @@ export default function GeneralSettingsContent() {
       } else {
         if (result.error !== 'Download cancelled') {
           console.error('Failed to download logs:', result.error)
-          alert(`Failed to download logs: ${result.error}`)
+          setStatusMessage(`Failed to download logs: ${result.error}`)
+          setStatusIndicator('error')
         }
       }
     } catch (error) {
       console.error('Error downloading logs:', error)
-      alert('An unexpected error occurred while downloading logs')
+      setStatusMessage('An unexpected error occurred while downloading logs')
+      setStatusIndicator('error')
     } finally {
       setIsDownloading(false)
     }
   }
 
-  const handleClearLogs = async () => {
-    const confirmed = confirm(
-      'Are you sure you want to clear all logs? This action cannot be undone.',
-    )
-    if (!confirmed) return
-
+  const performClearLogs = async () => {
+    setShowClearConfirm(false)
     setIsClearing(true)
     try {
       const result = await window.api.logs.clear()
       if (result.success) {
         console.log('Logs cleared successfully')
-        alert('Logs cleared successfully')
+        setStatusMessage('Logs cleared successfully')
+        setStatusIndicator('success')
       } else {
         console.error('Failed to clear logs:', result.error)
-        alert(`Failed to clear logs: ${result.error}`)
+        setStatusMessage(`Failed to clear logs: ${result.error}`)
+        setStatusIndicator('error')
       }
     } catch (error) {
       console.error('Error clearing logs:', error)
-      alert('An unexpected error occurred while clearing logs')
+      setStatusMessage('An unexpected error occurred while clearing logs')
+      setStatusIndicator('error')
     } finally {
       setIsClearing(false)
     }
@@ -156,7 +169,7 @@ export default function GeneralSettingsContent() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleClearLogs}
+              onClick={() => setShowClearConfirm(true)}
               disabled={isClearing}
             >
               {isClearing ? 'Clearing...' : 'Clear'}
@@ -164,6 +177,39 @@ export default function GeneralSettingsContent() {
           </div>
         </div>
       </div>
+
+      <Dialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
+        <DialogContent>
+          <DialogTitle>Clear all logs?</DialogTitle>
+          <DialogDescription>
+            This permanently deletes all local logs from your device and can&apos;t
+            be undone.
+          </DialogDescription>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowClearConfirm(false)}
+              type="button"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={performClearLogs}
+              type="button"
+            >
+              Clear
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <StatusIndicator
+        status={statusIndicator}
+        successMessage={statusMessage}
+        errorMessage={statusMessage}
+        onHide={() => setStatusIndicator(null)}
+      />
     </div>
   )
 }
