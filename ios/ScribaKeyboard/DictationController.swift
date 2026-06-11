@@ -29,6 +29,11 @@ final class DictationController: ObservableObject {
     private let impact = UIImpactFeedbackGenerator(style: .medium)
     private let notify = UINotificationFeedbackGenerator()
 
+    // Guards against a double-start: `state` only flips to `.recording` after the
+    // async `recorder.start()`, so a second quick tap would otherwise also start
+    // and install a second audio tap (an uncatchable crash).
+    private var isStarting = false
+
     init() {
         // If the system cuts the recording short (call, another app, AirPods
         // removed), finalize what we captured rather than losing it.
@@ -73,6 +78,11 @@ final class DictationController: ObservableObject {
     }
 
     private func startRecording() async {
+        // Ignore a second start that races the first (state is still .idle until
+        // the await below completes).
+        if isStarting || state == .recording { return }
+        isStarting = true
+        defer { isStarting = false }
         do {
             try await recorder.start()
             live.start() // live preview; no-op if speech permission isn't granted
@@ -87,7 +97,9 @@ final class DictationController: ObservableObject {
     private func finishRecording() async {
         live.stop()
         let audio = recorder.stop()
-        guard !audio.isEmpty else {
+        // A header-only WAV (no captured samples) isn't worth a round-trip — it'd
+        // just come back as "no speech". Treat it as a silent no-op.
+        guard audio.count > WAVEncoder.headerSize else {
             state = .idle
             return
         }
