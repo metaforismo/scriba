@@ -11,7 +11,8 @@
 > 5. Commit.
 
 ## Working constraints
-- Environment cannot build/run the Electron app, native (Rust/Swift) binaries, or the Bun server. So changes must be **correct by inspection** and, where possible, covered by **unit tests** (vitest) that are updated alongside.
+- Environment cannot build/run the Electron app, native Rust binaries (cargo 1.83 lacks `edition2024`), or the Bun server end-to-end. So changes must be **correct by inspection** and, where possible, covered by **unit tests** (`bun test`) updated alongside.
+- **NEW (iter 31): `xcodebuildmcp` + web-search MCP tools are now available.** Next iOS iteration should TRY actually building the keyboard target (`xcodegen generate` in `ios/`, then `mcp__xcodebuildmcp__build_sim`) to move iOS from correct-by-inspection to **compiled-verified**. TS lib/server/app suites still run via `bun runLibTests` / `runServerTests` / `runAppTests` (run files unloaded — slow tests like `billing` flake under CPU load).
 - Prefer **small, isolated, reversible** commits over big rewrites.
 - `main` is the working branch (CLAUDE.md still says `dev` — stale).
 
