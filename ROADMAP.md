@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 57 — 2026-06-11 (README accuracy for the public repo)
+- **Docs:** the public README missed **snippets** entirely and described context-awareness inaccurately ("learns from usage patterns" — Scriba doesn't). Updated the Features to what's actually shipped: app-aware formatting, snippets, language forcing, spoken email/URL formatting. Refreshed the **iOS section** to its real state (Auth0 done, unit-tested, number pad, smart spacing/CJK, haptics, audio-interruption handling) instead of "early foundation".
+- **Verified (no change):** the snippets-then-grammar ordering — keeping cleanup → grammar → snippets (verbatim expansion) is **safer** than swapping (which would wrongly capitalize an email expansion at a sentence start).
+- **Next:** small verified work; high-value items await the user (CI billing, streaming ASR provider).
+
 ### Iteration 56 — 2026-06-11 (iOS key-tap haptics) — PR #23
 - **Feat (iOS polish):** light haptic on each keypress (number-pad digits, space, delete, return, globe), like a system keyboard, so typing on Scriba feels native (mic keeps its medium impact). Build-verified; 31 tests pass. PR #23 → merged.
 - **Tried + abandoned:** automating the keyboard-enable flow in the sim to view the keyboard render — the iOS Settings List rows aren't exposed as tappable refs (only text), so the ~8-step enable flow can't be reliably automated here. Keyboard stays build-verified + logic-tested.
