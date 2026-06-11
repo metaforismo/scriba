@@ -39,14 +39,13 @@ final class AuthService: NSObject {
         let pkce = PKCE()
         let callbackURL = try await startWebAuth(url: buildAuthorizeURL(pkce: pkce))
 
-        let items =
-            URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?
-            .queryItems ?? []
-        guard
-            let state = items.first(where: { $0.name == "state" })?.value,
-            state == pkce.state
-        else { throw AuthError.stateMismatch }
-        guard let code = items.first(where: { $0.name == "code" })?.value else {
+        let code: String
+        do {
+            code = try OAuthCallback.code(
+                from: callbackURL, expectedState: pkce.state)
+        } catch OAuthCallback.CallbackError.stateMismatch {
+            throw AuthError.stateMismatch
+        } catch {
             throw AuthError.invalidCallback
         }
 
