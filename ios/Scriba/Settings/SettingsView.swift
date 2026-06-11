@@ -23,6 +23,12 @@ struct SettingsView: View {
                             } label: {
                                 Label("Sign in", systemImage: "person.crop.circle")
                             }
+                        } else {
+                            // Without Auth0 configured the section would otherwise be
+                            // empty; point the user at the developer-token fallback.
+                            Text("Sign-in isn't configured. Use a developer token below.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
                         if let error = auth.errorMessage {
                             Text(error)
