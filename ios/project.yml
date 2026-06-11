@@ -51,6 +51,7 @@ targets:
       - Shared/Credentials.swift
       - Scriba/Auth/PKCE.swift
       - Scriba/Auth/OAuthCallback.swift
+      - ScribaKeyboard/FieldMode.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.scriba.app.tests
