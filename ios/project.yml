@@ -46,6 +46,7 @@ targets:
     sources:
       - Tests
       - Shared/TextInsertion.swift
+      - Shared/WAVEncoder.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.scriba.app.tests
