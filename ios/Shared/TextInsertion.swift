@@ -16,9 +16,24 @@ enum TextInsertion {
         }
         // The transcript already starts with whitespace — nothing to add.
         if first.isWhitespace { return transcript }
+        // CJK scripts (Chinese/Japanese/Korean) don't separate words with spaces,
+        // so don't insert one when continuing CJK text. `Character.isLetter` is
+        // true for CJK, which would otherwise add a wrong space.
+        if isCJK(last) { return transcript }
         // Only add a space after a word or sentence punctuation, so we don't
         // insert one right after an opening bracket/quote or existing space.
         let needsSpace = last.isLetter || last.isNumber || ".,!?;:".contains(last)
         return needsSpace ? " " + transcript : transcript
+    }
+
+    /// True for CJK ideographs, kana, and Hangul — scripts that don't use spaces
+    /// between words.
+    private static func isCJK(_ char: Character) -> Bool {
+        char.unicodeScalars.contains { s in
+            (0x4E00...0x9FFF).contains(s.value)  // CJK Unified Ideographs
+                || (0x3400...0x4DBF).contains(s.value)  // CJK Extension A
+                || (0x3040...0x30FF).contains(s.value)  // Hiragana + Katakana
+                || (0xAC00...0xD7AF).contains(s.value)  // Hangul syllables
+        }
     }
 }
