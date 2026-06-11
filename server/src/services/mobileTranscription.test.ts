@@ -141,4 +141,20 @@ describe('registerMobileTranscriptionRoutes', () => {
 
     expect(res.statusCode).toBe(200)
   })
+
+  it('accepts a dictation body larger than Fastify default 1MB limit', async () => {
+    const app = createTestAppWithAuth()
+    await registerMobileTranscriptionRoutes(app, { requireAuth: true })
+
+    // ~1.6 MB of base64 — over Fastify's 1 MB default, well under the route cap.
+    const bigAudio = Buffer.alloc(1_200_000).toString('base64')
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/transcribe',
+      payload: { audio: bigAudio, fileType: 'wav' },
+    })
+
+    expect(res.statusCode).toBe(200)
+    expect(mockTranscribeAudio).toHaveBeenCalledTimes(1)
+  })
 })
