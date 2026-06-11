@@ -48,6 +48,7 @@ targets:
       - Shared/TextInsertion.swift
       - Shared/WAVEncoder.swift
       - Shared/FormURLEncoding.swift
+      - Shared/Credentials.swift
       - Scriba/Auth/PKCE.swift
       - Scriba/Auth/OAuthCallback.swift
     settings:
