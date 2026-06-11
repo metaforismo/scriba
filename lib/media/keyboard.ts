@@ -34,6 +34,27 @@ let activeShortcutId: string | null = null
 // once all keys are released.
 let dictationSuppressed = false
 
+// --- Hands-free (double-tap) state (only used when handsFreeEnabled) ---
+// A hands-free session is recording (started by a double-tap; keeps going after
+// the keys are released until the next tap).
+let handsFreeActive = false
+// Timestamp of the current activation, to tell a hold from a quick tap.
+let activationAt = 0
+// Pending single-tap: after a quick tap we defer completion briefly so a second
+// tap can upgrade it to hands-free. Fires completeSession if no second tap comes.
+let pendingTapTimer: NodeJS.Timeout | null = null
+// Holds at/above this are push-to-talk; shorter presses are taps.
+const HOLD_THRESHOLD_MS = 250
+// A follow-up press within this of a quick-tap release counts as a double-tap.
+const DOUBLE_TAP_WINDOW_MS = 350
+
+function clearPendingTap() {
+  if (pendingTapTimer) {
+    clearTimeout(pendingTapTimer)
+    pendingTapTimer = null
+  }
+}
+
 // Heartbeat monitoring state
 let lastHeartbeatReceived = Date.now()
 let heartbeatCheckTimer: NodeJS.Timeout | null = null
@@ -46,6 +67,9 @@ export const resetForTesting = () => {
     KeyListenerProcess = null
     activeShortcutId = null
     dictationSuppressed = false
+    handsFreeActive = false
+    activationAt = 0
+    clearPendingTap()
     pressedKeys.clear()
     keyPressTimestamps.clear()
     stopStuckKeyChecker()
@@ -186,15 +210,15 @@ function stopStuckKeyChecker() {
 // for any in-flight startSession before taking ownership), which is what prevents
 // a fast key-up from tearing down a session whose start is still mid-await.
 function handleKeyEventInMain(event: KeyEvent) {
-  const { isShortcutGloballyEnabled, keyboardShortcuts } = store.get(
-    STORE_KEYS.SETTINGS,
-  )
+  const { isShortcutGloballyEnabled, keyboardShortcuts, handsFreeEnabled } =
+    store.get(STORE_KEYS.SETTINGS)
 
   if (!isShortcutGloballyEnabled) {
-    // check to see if we should stop an in-progress recording
-    if (activeShortcutId !== null) {
-      // Shortcut released
+    // check to see if we should stop an in-progress recording (incl. hands-free)
+    if (activeShortcutId !== null || handsFreeActive || pendingTapTimer !== null) {
       activeShortcutId = null
+      handsFreeActive = false
+      clearPendingTap()
       console.info('Shortcut DEACTIVATED, stopping recording...')
       scribaSessionManager.completeSession()
     }
@@ -214,13 +238,17 @@ function handleKeyEventInMain(event: KeyEvent) {
   // Escape cancels an in-progress dictation (discard the audio, don't transcribe).
   // The hotkey is typically still held, so suppress reactivation until it's
   // released; pressedKeys keeps tracking the held keys so de-dup still works.
+  // Also covers a hands-free session (keys already released, activeShortcutId
+  // null) and a quick tap awaiting a double-tap.
   if (
     event.type === 'keydown' &&
     normalizedKey === 'esc' &&
-    activeShortcutId !== null
+    (activeShortcutId !== null || handsFreeActive || pendingTapTimer !== null)
   ) {
     console.info('Escape pressed during dictation, cancelling...')
     activeShortcutId = null
+    handsFreeActive = false
+    clearPendingTap()
     dictationSuppressed = true
     scribaSessionManager.cancelSession()
     return
@@ -270,8 +298,32 @@ function handleKeyEventInMain(event: KeyEvent) {
       // A dictation was just cancelled with Escape; wait for a full key release
       // before allowing the still-held combo to start a new session.
       if (dictationSuppressed) return
-      // Starting a new session
+
+      if (handsFreeEnabled) {
+        // A press while a hands-free session is recording STOPS it.
+        if (handsFreeActive) {
+          handsFreeActive = false
+          activeShortcutId = currentlyHeldShortcut.id
+          console.info('lib Hands-free STOPPED by tap, completing...')
+          scribaSessionManager.completeSession()
+          activeShortcutId = null
+          return
+        }
+        // A press while a quick tap is still pending = double-tap. The session
+        // from the first tap is still recording, so just keep it going
+        // hands-free instead of completing it.
+        if (pendingTapTimer !== null) {
+          clearPendingTap()
+          handsFreeActive = true
+          activeShortcutId = currentlyHeldShortcut.id
+          console.info('lib Double-tap → HANDS-FREE, keep recording...')
+          return
+        }
+      }
+
+      // Starting a new session (push-to-talk hold, or the first of a double-tap)
       activeShortcutId = currentlyHeldShortcut.id
+      activationAt = Date.now()
       console.info('lib Shortcut ACTIVATED, starting recording...')
       scribaSessionManager.startSession(currentlyHeldShortcut.mode)
     } else if (activeShortcutId !== currentlyHeldShortcut.id) {
@@ -285,8 +337,30 @@ function handleKeyEventInMain(event: KeyEvent) {
   } else if (!currentlyHeldShortcut) {
     // No shortcut detected - cancel pending activation or deactivate active shortcut
     if (activeShortcutId !== null) {
-      // Shortcut released - deactivate immediately (no debounce on release)
+      // While hands-free, releasing the keys does NOT stop — keep recording
+      // until the next tap. Just clear the active marker.
+      if (handsFreeEnabled && handsFreeActive) {
+        activeShortcutId = null
+        return
+      }
+
+      const heldMs = Date.now() - activationAt
       activeShortcutId = null
+
+      // Hands-free: a quick tap (not a hold) is the first tap of a possible
+      // double-tap — defer completion briefly. A follow-up press upgrades it to
+      // hands-free; otherwise the timer completes it. A real hold completes now.
+      if (handsFreeEnabled && heldMs < HOLD_THRESHOLD_MS) {
+        clearPendingTap()
+        pendingTapTimer = setTimeout(() => {
+          pendingTapTimer = null
+          console.info('lib Single tap, completing...')
+          scribaSessionManager.completeSession()
+        }, DOUBLE_TAP_WINDOW_MS)
+        return
+      }
+
+      // Shortcut released - deactivate immediately (no debounce on release)
       console.info('lib Shortcut DEACTIVATED, stopping recording...')
       scribaSessionManager.completeSession()
     }
@@ -484,11 +558,14 @@ export const stopKeyListener = () => {
     // If a dictation is in flight, the listener is going away (heartbeat-timeout
     // restart, or quit) so the key-up that would stop it will never arrive.
     // Cancel the orphaned session instead of leaving the recording stuck on.
-    if (activeShortcutId !== null) {
+    // Covers a hands-free session and a pending quick tap too.
+    if (activeShortcutId !== null || handsFreeActive || pendingTapTimer !== null) {
       console.warn(
         '[Key listener] Stopping with an active session; cancelling it to avoid an orphaned recording.',
       )
       activeShortcutId = null
+      handsFreeActive = false
+      clearPendingTap()
       scribaSessionManager.cancelSession()
     }
 

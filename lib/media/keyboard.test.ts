@@ -1730,4 +1730,96 @@ describe('Keyboard Module', () => {
       )
     })
   })
+
+  describe('Hands-free (double-tap) Logic', () => {
+    const handsFreeSettings = {
+      isShortcutGloballyEnabled: true,
+      handsFreeEnabled: true,
+      keyboardShortcuts: [
+        { id: 'hf-test', keys: ['command', 'space'], mode: ScribaMode.TRANSCRIBE },
+      ],
+    }
+    const emit = (event: object) =>
+      mockChildProcess.stdout.emit(
+        'data',
+        Buffer.from(JSON.stringify(event) + '\n'),
+      )
+    const down = (key: string) => emit({ type: 'keydown', key, raw_code: 0 })
+    const up = (key: string) => emit({ type: 'keyup', key, raw_code: 0 })
+    const tap = () => {
+      down('MetaLeft')
+      down('Space')
+      up('MetaLeft')
+      up('Space')
+    }
+
+    test('double-tap starts hands-free; release keeps recording; next tap stops', async () => {
+      mockMainStore.get.mockReturnValue(handsFreeSettings)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // First quick tap: starts a session, completion deferred (not a hold).
+      tap()
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      // Second tap within the window → double-tap → hands-free; no new session,
+      // and releasing the keys does NOT stop it.
+      down('MetaLeft')
+      down('Space')
+      up('MetaLeft')
+      up('Space')
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      // A later tap stops the hands-free session.
+      down('MetaLeft')
+      down('Space')
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+      up('MetaLeft')
+      up('Space')
+    })
+
+    test('a single tap completes after the double-tap window', async () => {
+      mockMainStore.get.mockReturnValue(handsFreeSettings)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      tap()
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      clock.tick(420) // > DOUBLE_TAP_WINDOW_MS (350)
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+    })
+
+    test('holding still works as push-to-talk when hands-free is on', async () => {
+      mockMainStore.get.mockReturnValue(handsFreeSettings)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      down('MetaLeft')
+      down('Space')
+      expect(mockScribaSessionManager.startSession).toHaveBeenCalledTimes(1)
+
+      clock.tick(300) // > HOLD_THRESHOLD_MS (250) → a real hold
+      up('MetaLeft')
+      up('Space')
+      expect(mockScribaSessionManager.completeSession).toHaveBeenCalledTimes(1)
+    })
+
+    test('Escape cancels a hands-free session', async () => {
+      mockMainStore.get.mockReturnValue(handsFreeSettings)
+      const { startKeyListener } = await import('./keyboard')
+      startKeyListener()
+
+      // Enter hands-free via double-tap.
+      tap()
+      tap()
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+
+      down('Escape')
+      expect(mockScribaSessionManager.cancelSession).toHaveBeenCalledTimes(1)
+      expect(mockScribaSessionManager.completeSession).not.toHaveBeenCalled()
+    })
+  })
 })

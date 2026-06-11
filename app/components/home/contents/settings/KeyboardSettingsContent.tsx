@@ -1,9 +1,11 @@
 import { useSettingsStore } from '@/app/store/useSettingsStore'
 import { ScribaMode } from '@/app/generated/scriba_pb'
 import MultiShortcutEditor from '@/app/components/ui/multi-shortcut-editor'
+import { Switch } from '@/app/components/ui/switch'
 
 export default function KeyboardSettingsContent() {
-  const { getScribaModeShortcuts } = useSettingsStore()
+  const { getScribaModeShortcuts, handsFreeEnabled, setHandsFreeEnabled } =
+    useSettingsStore()
   const transcribeShortcuts = getScribaModeShortcuts(ScribaMode.TRANSCRIBE)
   const editShortcuts = getScribaModeShortcuts(ScribaMode.EDIT)
 
@@ -38,6 +40,20 @@ export default function KeyboardSettingsContent() {
             <MultiShortcutEditor
               shortcuts={editShortcuts}
               mode={ScribaMode.EDIT}
+            />
+          </div>
+          <div className="flex gap-4 justify-between items-start">
+            <div className="w-2/3">
+              <div className="text-sm font-medium mb-2">Hands-free dictation</div>
+              <div className="text-xs text-gray-600 mb-4">
+                Double-tap your shortcut to start dictating hands-free — it keeps
+                recording after you let go, and a single tap stops and inserts.
+                Holding still works as push-to-talk.
+              </div>
+            </div>
+            <Switch
+              checked={handsFreeEnabled}
+              onCheckedChange={setHandsFreeEnabled}
             />
           </div>
         </div>

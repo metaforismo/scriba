@@ -33,6 +33,10 @@ export interface SettingsStore {
   microphoneName: string
   isShortcutGloballyEnabled: boolean
   keyboardShortcuts: KeyboardShortcutConfig[]
+  // When true, double-tapping a dictation shortcut starts a hands-free session
+  // (keeps recording after the keys are released; a later tap stops it). Holding
+  // still works as push-to-talk. Default off.
+  handsFreeEnabled: boolean
   snippets: Snippet[]
   firstName: string
   lastName: string
@@ -146,6 +150,7 @@ export const defaultValues: AppStore = {
         mode: ScribaMode.EDIT,
       },
     ],
+    handsFreeEnabled: false,
     snippets: [],
     firstName: '',
     lastName: '',
