@@ -63,7 +63,7 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ### P2 — Power features (match Wispr)
 - [ ] **Command Mode**: select → hotkey → spoken instruction → replace selection / insert at cursor. translate/summarize/tone + "press enter".
 - [ ] **Dictionary learns from corrections automatically** + dev-term/code-syntax awareness.
-- [ ] **Snippets / voice text-expansion.**
+- [~] **Snippets / voice text-expansion.** Engine done (PR #5): tested `expandSnippets`, `snippets` store field + `getSnippets()`, applied to the transcript before insertion. **Next: the management UI** (a settings section to add/remove snippets) — inert until then.
 - [ ] **Multilingual + auto language detect** surfaced in settings (Whisper already auto-detects; no UI).
 - [ ] **Privacy-safe app-context formatting** (on-device active-window text, loudly disclosed, toggleable).
 
@@ -94,6 +94,10 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 ---
 
 ## Progress Log (newest first)
+
+### Iteration 26 — 2026-06-11 (snippets engine) — PR #5
+- **Feat (desktop, Wispr parity):** voice **text-expansion snippets** engine. `expandSnippets()` (pure, +6 tests: whole-word, case-insensitive, longest-first, lookaround boundaries so `c++`/`@home` match); `snippets` settings-store field (defaults `[]`) + `getSnippets()`; wired into `scribaSessionManager` to expand the final transcript before insertion (+1 test). Default empty → no behavior change. PR #5 → merged.
+- **Next (snippets):** the **management UI** — a settings section to add/remove snippets (the engine is inert until users can define them). Then it's a complete feature.
 
 ### Iteration 25 — 2026-06-11
 - **Fix (renderer UX):** the microphone picker showed an empty scroll area while enumerating devices (or when none were found / permission denied), with no feedback. Added a "Loading microphones…" state and a "No microphones found" empty state (with a connection/permission hint). Web type-check clean for the file.
