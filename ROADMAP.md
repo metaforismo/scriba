@@ -96,6 +96,12 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 49 — 2026-06-11 (iOS number pad — beats Wispr on the #1 keyboard gripe) — PR #18
+- **Researched** Wispr iOS complaints (firecrawl/Reddit "Terrible Keyboard"): the top gripe is that **numeric/phone fields force a switch back to the system keyboard**.
+- **Feat (iOS):** Scriba now renders a **built-in number pad** (1-9, ., 0, delete) for numeric fields instead of the "switch keyboard" prompt, so users enter numbers without leaving the keyboard — a genuine win over Wispr. Secure fields still defer to the system keyboard (don't build a custom secure input). Added an `onInsert` callback; `KeyboardView` switches on `fieldMode`. Build-verified; 26 iOS tests pass. PR #18 → merged.
+- **Process note:** a transient network outage failed the push/PR mid-flow; recovered — the commit was safe on the local branch, re-pushed once the network returned.
+- **Next:** more research-driven, testable/runtime-verified work.
+
 ### Iteration 48 — 2026-06-11 (iOS audio interruption handling) — PR #17
 - **Researched** real Wispr complaints (firecrawl): an App Store review — "keeps losing my transcription on long-form, especially with AirPods" — pointed at unhandled **audio-session interruptions / route changes**.
 - **Fix (iOS):** `AudioRecorder` now observes `AVAudioSession` interruption (`.began`) and route-change (`.oldDeviceUnavailable`, e.g. AirPods removed) notifications → `onInterrupted`; `DictationController` **finalizes the in-progress recording** so the audio captured before the interruption is transcribed instead of silently dropped. Build-verified; 26 iOS tests still pass. PR #17 → merged.
