@@ -1,0 +1,51 @@
+name: iOS Build & Test
+
+# Runs standalone (not via the CI controller) so the iOS check works
+# independently. Path-filtered to iOS changes to save macOS runner minutes.
+on:
+  push:
+    branches: ['main', 'dev']
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build-check.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build-check.yml'
+  workflow_call:
+
+jobs:
+  ios-build-test:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      # The runner's available iPhone simulators vary by Xcode version, so pick
+      # one dynamically rather than hard-coding a device name.
+      - name: Select an iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available --json | python3 -c "import sys, json; devices = json.load(sys.stdin)['devices']; ids = [d['udid'] for runtime in devices for d in devices[runtime] if 'iPhone' in d['name'] and d.get('isAvailable', False)]; print(ids[0])")
+          echo "Using simulator $UDID"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build & run tests (simulator)
+        working-directory: ios
+        env:
+          SIM_UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          xcodebuild test \
+            -project Scriba.xcodeproj \
+            -scheme Scriba \
+            -destination "id=$SIM_UDID" \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO
