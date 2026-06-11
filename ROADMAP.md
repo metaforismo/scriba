@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 45 — 2026-06-11 (iOS Credentials expiry/Codable tested) — PR #16
+- **Test (iOS):** covered `Credentials.isExpired` / `expiresSoon` (drives proactive token refresh — wrong thresholds → refreshing too early or, worse, requests failing on an expired token) and the Codable round-trip (Credentials is JSON-persisted in the Keychain; an encoding bug would break token storage). Default + custom refresh window, nil-optional encoding. **26 iOS tests total, TEST SUCCEEDED.** PR #16 → merged.
+- **iOS tests (26):** smart-spacing, WAV, PKCE, form-encoding, OAuth callback/CSRF, Credentials.
+- **Next:** more testable/runtime-verified work.
+
 ### Iteration 44 — 2026-06-11 (iOS OAuth callback / CSRF tested) — PR #15
 - **Test (iOS, security):** extracted the OAuth redirect parsing out of `AuthService.signIn` into a pure `OAuthCallback.code(from:expectedState:)` and covered it — the `state` check is **CSRF protection** (a forged/mismatched state must be rejected). Tests: matching state→code, mismatched state, missing state, missing/empty code. **21 iOS tests total, TEST SUCCEEDED.** PR #15 → merged.
 - **Decided NOT to touch** the `useAuth.ts` `alert()` (the last native dialog): no component renders `useAuthStore.error`, so swapping `alert()`→`setError()` would make the auth-failure **invisible** (silent failure, worse). Left the visible fallback; a proper fix needs an auth-flow error surface (multi-file, risky) — deferred.
