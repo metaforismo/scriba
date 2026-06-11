@@ -96,6 +96,11 @@ Legend: `[ ]` todo · `[~]` in progress · `[x]` done (see Progress Log) · 🔒
 
 ## Progress Log (newest first)
 
+### Iteration 54 — 2026-06-11 (iOS onboarding: keyboard detection + foreground refresh) — PR #21
+- **Runtime-verified** the onboarding by driving the sim: tapped "Allow microphone" → the system prompt appeared with the correct usage string ("Scriba uses the microphone to transcribe your speech into text."); granting flipped step 2 to "✓ Microphone access granted". The mic flow works end-to-end.
+- **Feat (iOS):** step 1 (add the keyboard) was purely instructional — now detects whether the Scriba keyboard has been added (standard `AppleKeyboards` list; graceful fallback to instructions) and shows "Keyboard added". Both steps now re-check on `scenePhase .active` so the screen updates when the user returns from Settings. Build- + runtime-verified. PR #21 → merged.
+- **Next:** more research-driven/testable/runtime-verified work.
+
 ### Iteration 53 — 2026-06-11 (desktop CJK spacing — same bug as iOS)
 - **Fix (desktop, multilingual):** the iOS CJK find (iter 52) applied to desktop too — `GrammarRulesService.needsLeadingSpace` defaulted to `return true` for any non-whitespace/non-opening-punct char, so CJK text got a wrong leading space when grammar service is enabled. Added the same CJK check (ideographs, kana, Hangul); accented Latin etc. unaffected. +2 tests; grammar suite green. Direct to main.
 - **Next:** more research-driven/testable work.
