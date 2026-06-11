@@ -22,11 +22,13 @@ export const TRANSCRIPT_CLEANUP_PROMPT: { light: string; heavy: string } = {
 - Remove filler words ("uh", "um", "you know", "like") and false starts.
 - Fix capitalization and punctuation.
 - Resolve obvious self-corrections, keeping the speaker's final phrasing.
+- Render clearly-spoken emails, URLs, and @handles in written form (e.g. "john at gmail dot com" -> "john@gmail.com", "github dot com slash scriba" -> "github.com/scriba").
 Otherwise keep the user's exact wording, tone, and sentence structure. Do NOT summarize, rephrase, translate, or add anything. Return only the cleaned transcript.`,
   heavy: `Clean up this dictation transcript thoroughly for readability:
 - Remove fillers, false starts, and repetition.
 - Fix grammar, punctuation, and capitalization.
 - Resolve self-corrections, tighten wordy phrasing, and split into paragraphs or bullet lists where it genuinely helps.
+- Render clearly-spoken emails, URLs, and @handles in written form (e.g. "john at gmail dot com" -> "john@gmail.com", "github dot com slash scriba" -> "github.com/scriba").
 Preserve the user's meaning, intent, key details (names, dates, numbers), and overall tone. Do NOT invent content, answer questions in the text, or add commentary. Return only the cleaned transcript.`,
 }
 
