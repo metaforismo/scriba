@@ -72,7 +72,11 @@ final class AudioRecorder: ObservableObject {
         do {
             try engine.start()
         } catch {
+            // Tear down everything we set up so a retry starts clean (otherwise
+            // the observers leak and the session stays active).
             input.removeTap(onBus: 0)
+            removeSessionObservers()
+            try? session.setActive(false, options: [.notifyOthersOnDeactivation])
             throw RecorderError.engineFailed(error)
         }
         publish(isRecording: true, level: 0)

@@ -29,12 +29,14 @@ final class LiveTranscriber: ObservableObject {
     /// Begins a live recognition session. No-op (server path still works) if
     /// permission isn't granted or a recognizer isn't available.
     func start() {
+        // Clear any leftover preview first, so an unavailable recognizer (early
+        // return below) can't leave a previous session's words on screen.
+        publish("")
         guard SFSpeechRecognizer.authorizationStatus() == .authorized,
             let recognizer = SFSpeechRecognizer(locale: Self.locale()),
             recognizer.isAvailable
         else { return }
 
-        publish("")
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         // Keep the live preview on-device (private, no network) when supported.
@@ -63,6 +65,7 @@ final class LiveTranscriber: ObservableObject {
         }
         task?.cancel()
         task = nil
+        publish("")
     }
 
     private func publish(_ text: String) {
